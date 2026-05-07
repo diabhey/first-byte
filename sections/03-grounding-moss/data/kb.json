@@ -1,0 +1,77 @@
+[
+  {
+    "id": "company-overview",
+    "text": "Compass Coffee is a single-origin coffee subscription service based in Amsterdam. We ship freshly roasted beans worldwide, sourced directly from farms in Ethiopia, Colombia, and Guatemala. All beans are roasted within 48 hours of shipment.",
+    "metadata": {"topic": "company"}
+  },
+  {
+    "id": "subscription-tiers",
+    "text": "Compass Coffee subscriptions come in three tiers. Explorer ships 250 grams every two weeks for 14 euros per shipment. Roaster ships 500 grams every two weeks for 26 euros. Cellar ships 1 kilogram monthly for 48 euros and includes early access to limited single-lot beans.",
+    "metadata": {"topic": "products"}
+  },
+  {
+    "id": "shipping-eu",
+    "text": "Shipping inside the European Union takes two to four business days and is free for all subscriptions. Tracking numbers are sent by email when the package leaves our roastery in Amsterdam.",
+    "metadata": {"topic": "shipping"}
+  },
+  {
+    "id": "shipping-international",
+    "text": "International shipping outside the EU takes five to nine business days and costs 8 euros per shipment, regardless of subscription tier. Customs duties are paid by the recipient.",
+    "metadata": {"topic": "shipping"}
+  },
+  {
+    "id": "refund-policy",
+    "text": "Compass Coffee offers a thirty day satisfaction guarantee. If you are unhappy with your beans, email refunds at compasscoffee dot com with your order ID for a full refund. No questions asked. You do not need to return the beans.",
+    "metadata": {"topic": "policies"}
+  },
+  {
+    "id": "pause-subscription",
+    "text": "You can pause your subscription at any time from your account dashboard. Paused subscriptions resume automatically after eight weeks unless you extend the pause manually. There is no penalty for pausing.",
+    "metadata": {"topic": "account"}
+  },
+  {
+    "id": "decaf-options",
+    "text": "Compass Coffee offers a Swiss water decaf option for the Explorer and Roaster tiers. The Cellar tier is single-lot only and is not available decaffeinated. Decaf adds 2 euros per shipment.",
+    "metadata": {"topic": "products"}
+  },
+  {
+    "id": "grind-options",
+    "text": "All beans ship whole bean by default. You can request pre-ground beans at no additional cost. Grind options are espresso, filter, French press, and AeroPress. Pre-ground beans should be consumed within ten days for best flavor.",
+    "metadata": {"topic": "products"}
+  },
+  {
+    "id": "brewing-tips",
+    "text": "For best results with single-origin beans, use a 1 to 16 ratio of coffee to water by weight. Filter brew works best at 92 to 94 degrees Celsius. Espresso shots are pulled at 9 bars of pressure for 25 to 30 seconds. Always grind just before brewing.",
+    "metadata": {"topic": "brewing"}
+  },
+  {
+    "id": "ethiopia-yirgacheffe",
+    "text": "Our Ethiopian Yirgacheffe is sourced from a single cooperative in the Gedeo Zone. Tasting notes are jasmine, bergamot, and stone fruit. Light roasted to preserve floral character. Best enjoyed as filter or pour over.",
+    "metadata": {"topic": "origins"}
+  },
+  {
+    "id": "colombia-huila",
+    "text": "Our Colombian Huila is from a smallholder farm in the southern Andes. Tasting notes are caramel, milk chocolate, and red apple. Medium roasted. Versatile across espresso and filter brewing.",
+    "metadata": {"topic": "origins"}
+  },
+  {
+    "id": "guatemala-antigua",
+    "text": "Our Guatemalan Antigua comes from a single estate at 1500 meters elevation. Tasting notes are dark chocolate, brown sugar, and roasted hazelnut. Medium dark roasted. Excellent for espresso and milk drinks.",
+    "metadata": {"topic": "origins"}
+  },
+  {
+    "id": "support-hours",
+    "text": "Customer support is available Monday through Friday from 9 in the morning until 6 in the evening Central European Time. Email support at compasscoffee dot com or call us. We respond to most emails within 4 hours.",
+    "metadata": {"topic": "support"}
+  },
+  {
+    "id": "wholesale",
+    "text": "Compass Coffee offers wholesale pricing for cafes, restaurants, and offices ordering at least 5 kilograms per month. Wholesale customers receive 25 percent off retail and dedicated account management. Apply at compasscoffee dot com slash wholesale.",
+    "metadata": {"topic": "wholesale"}
+  },
+  {
+    "id": "gift-subscriptions",
+    "text": "Gift subscriptions are available for one, three, six, or twelve months. The recipient receives a welcome email on the date you specify and can choose their preferred origin and grind. Gift subscriptions do not auto-renew.",
+    "metadata": {"topic": "gifts"}
+  }
+]
