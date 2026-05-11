@@ -89,7 +89,18 @@ That's the entire pattern. 30 lines.
 
 ## Going further
 
-- **Custom visitor-facing frontend**: the Agents Playground is for development. To put a real user in front of your agent on your own site, you need three things: a token endpoint (Node, Python, or Edge function that mints a LiveKit access token), the [LiveKit JS SDK](https://docs.livekit.io/reference/client-sdk-js/) (`livekit-client`) to join a room from the browser, and a UI that handles mic permissions and the connecting/listening/speaking states. For a polished feel, drive a canvas or SVG animation from the agent's audio track using the Web Audio `AnalyserNode`: a simple state machine (`idle → connecting → listening → thinking → speaking`) plus per-frame RMS sampling gives you the audio-reactive orb pattern most production voice products ship.
+- **Custom visitor-facing frontend** — three concrete pieces you'll need, with the patterns I run in production:
+
+  1. **Token endpoint.** Mint short-lived LiveKit JWTs server-side so the secret never reaches the browser. A Cloudflare Pages Function at `/api/token` is the lightest option: ~80 lines of JS, no npm deps, signs the JWT with the Web Crypto API (`crypto.subtle.sign` is native to the Workers runtime). Set `LIVEKIT_API_KEY` / `LIVEKIT_API_SECRET` / `LIVEKIT_URL` as Pages env vars (`wrangler pages secret put`) and your endpoint returns `{ url, token, room }` per request. 15-minute TTL on the token.
+
+  2. **Browser client.** Drop in the [LiveKit JS SDK](https://docs.livekit.io/reference/client-sdk-js/) (`livekit-client` via CDN, no build pipeline needed) and an audio-reactive UI. The agent dispatch happens whenever a room is created, so the orb just calls `room.connect(url, token)`. For the orb itself: a state machine (`idle → connecting → listening → thinking → speaking → error`) wired to LiveKit's `ActiveSpeakersChanged` event, plus a Web Audio `AnalyserNode` reading volume from both the local mic and the remote agent track. Per-frame `getByteFrequencyData()` into a normalized volume drives a canvas / Three.js animation. A `setTimeout` fallback covers the "user stopped, agent hasn't started" thinking state.
+
+  3. **Three security layers, in order of effort.** A public talk-to-me endpoint is wide open by default. Add them as soon as you have real visitors:
+     - **Origin / Sec-Fetch-Site check** inside the Pages Function. Reject anything without `Sec-Fetch-Site: same-origin` or a whitelisted `Origin`. Stops `curl` from anywhere.
+     - **Per-visitor unique rooms.** Instead of one shared room name, generate `<prefix>-<uuid>` per token. A bot in their own room can't disrupt a real visitor in another room. LiveKit Cloud Agents auto-dispatch one worker per new room, no agent code change.
+     - **Cloudflare WAF rate limiting.** Dashboard rule on `/api/token`: e.g. 10 req/min/IP → 429. Stops mass token harvesting before the Pages Function even runs.
+
+  Once these are in place, `lk agent deploy` (the update equivalent of `lk agent create`) lets you ship new agent code without rebuilding the front end or rotating secrets. Same architecture I shipped at [heartbyte.io](https://heartbyte.io) — three repos (static site on CF Pages, Python agent on LiveKit Cloud, Moss for retrieval) meeting at the LiveKit project.
 - **Telephony**: `lk sip` to wire a phone number. Buy a DID via LiveKit Phone Numbers in the Cloud dashboard, set up a dispatch rule, your agent picks up real calls. See [docs.livekit.io/sip](https://docs.livekit.io/sip/).
 - **Vision**: Gemini Live and OpenAI's realtime models support video input. Pass a video track and ask the agent what it sees.
 - **Avatars**: Tavus and Anam render a photorealistic talking head. Plug in via the avatar plugins.
