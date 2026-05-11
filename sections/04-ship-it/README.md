@@ -4,13 +4,15 @@
 
 Wire production observability, then deploy the agent to LiveKit Cloud Agents with a single command. By the end of this section your agent runs on the public internet against LiveKit's global network and infrastructure.
 
-## Step 1: Run locally with metrics
+## Step 1: Wire production metrics (Exercise 7)
+
+Open [`agent_start.py`](./agent_start.py). The §3 grounded agent is in place; the three event handlers and shutdown callback are your TODOs. Implement them inside `entrypoint()`, then run:
 
 ```bash
-uv run python sections/04-ship-it/agent.py dev
+uv run python sections/04-ship-it/agent_start.py dev
 ```
 
-Connect via the [Agents Playground](https://agents-playground.livekit.io) and have a conversation. Watch your terminal:
+The finished reference is in [`agent.py`](./agent.py). Connect via the [Agents Playground](https://agents-playground.livekit.io) and have a conversation. Watch your terminal:
 
 - **`[metrics] turn e2e_latency=...`** logs fire once per assistant turn, sourced from `ChatMessage.metrics` on the `conversation_item_added` event. STT first byte, LLM time-to-first-token, TTS first audio chunk, and end-to-end are all here. This is your latency budget audit in real time.
 - **`[usage] ...`** logs fire whenever `session_usage_updated` ticks, and once more on shutdown via `add_shutdown_callback` for the final cumulative tally. Tokens in/out per provider and audio durations.
@@ -50,9 +52,21 @@ After deploy:
 
 1. Open [cloud.livekit.io](https://cloud.livekit.io) and find your new agent.
 2. Set environment variables in the agent's settings: `MOSS_PROJECT_ID`, `MOSS_PROJECT_KEY`, `MOSS_INDEX_NAME`. (The LiveKit and OpenAI/Deepgram/Cartesia credentials are handled by LiveKit Inference automatically.)
-3. Note the agent ID.
+3. Note the agent ID. `lk agent create` writes it to a new `livekit.toml` in this directory. That file is gitignored; copy `livekit.toml.example` as a reference for the shape.
+
+For redeploys, `lk agent deploy` reads `livekit.toml` and rolls a new container without touching dashboard secrets.
 
 That's it. No Kubernetes manifest, no SSL cert wrangling.
+
+### What's pre-staged
+
+This directory ships as a self-contained deployable Python project so `lk agent create` works without surprises:
+
+- `agent.py` / `agent_start.py` — the worker.
+- `pyproject.toml` + `uv.lock` — pinned deps. Section-local, intentionally separate from the repo-root `pyproject.toml` (which is for the course's dev environment).
+- `Dockerfile` — uses `python:3.13-slim-trixie` (glibc 2.38) with `uv` from astral's image. The default `lk agent create` Dockerfile uses Bookworm (glibc 2.36), which silently fails to install `inferedge-moss-core` because the wheel is `manylinux_2_38_x86_64`. Pre-staging Trixie avoids that 5-minute live debug.
+- `.dockerignore` — keeps `.env`, `.git`, editor files, and coding-agent dotfiles out of the build context.
+- `livekit.toml.example` — template for the auto-generated `livekit.toml`.
 
 ## Step 3: Talk to your deployed agent from a local orb page
 
@@ -66,11 +80,11 @@ cp config.template.js config.js
 Edit `config.js` and fill in three values:
 
 - `URL`: your LiveKit Cloud `wss://...livekit.cloud` (same one in your `.env`)
-- `TOKEN`: a 24h LiveKit access token for room `compass-coffee`:
+- `TOKEN`: a 24h LiveKit access token for room `heartbyte-orb`:
   ```bash
-  lk token create --room compass-coffee --identity orb-visitor --valid-for 24h
+  lk token create --room heartbyte-orb --identity orb-visitor --valid-for 24h
   ```
-- `ROOM`: leave as `compass-coffee` (default)
+- `ROOM`: leave as `heartbyte-orb` (default)
 
 Then serve the page:
 
@@ -78,44 +92,11 @@ Then serve the page:
 python3 -m http.server 8000
 ```
 
-Open <http://localhost:8000> → tap the orb → grant the mic → ask about a coffee order. Your browser connects over WebRTC to your LiveKit Cloud project; LiveKit dispatches your deployed worker to the room; the agent does STT → Moss retrieval → LLM → TTS and the reply streams back. The orb's color and state indicator track listening → thinking → speaking. Tap the orb during a live session to disconnect.
+Open <http://localhost:8000> → tap the orb → grant the mic → ask "What is HeartByte?" Your browser connects over WebRTC to your LiveKit Cloud project; LiveKit dispatches your deployed worker to the room; the agent does STT → Moss retrieval → LLM → TTS and the reply streams back. The orb's color and state indicator track listening → thinking → speaking. Tap the orb during a live session to disconnect.
 
-That's the full architecture in three pieces: static webpage (front end), LiveKit Cloud (signaling + dispatch), your agent worker (the brain). All three meet at the room name in your token.
+That's the full architecture in three pieces: static webpage (front end), LiveKit Cloud (signaling + dispatch), your agent worker (the brain). All three meet at the room name in your token. The agent you just deployed runs the same KB as [heartbyte.io](https://heartbyte.io) — you are literally talking to the production HeartByte orb running on your own LiveKit project.
 
-When you ship this for real visitors (`heartbyte.io` style), you replace the local token in `config.js` with a server-side token endpoint that mints per-visitor tokens — see Going further below.
-
-> **Heads-up about the auto-generated Dockerfile.** `lk agent create` will drop a starter Dockerfile in your directory using `ghcr.io/astral-sh/uv:python3.13-bookworm-slim` as the base. Debian Bookworm ships glibc 2.36; `inferedge-moss-core` (the binary behind the `moss` package) only ships wheels for `manylinux_2_38_x86_64` on Linux x86_64. The build will fail at `uv sync --locked`. Fix: swap the base to `python:3.13-slim-trixie` (Debian 13, glibc 2.38) and copy the `uv` binary from astral's image:
->
-> ```dockerfile
-> ARG PYTHON_VERSION=3.13
-> FROM python:${PYTHON_VERSION}-slim-trixie AS base
-> COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /usr/local/bin/
-> ```
->
-> Apply the same change in the `--- Production stage ---` `FROM base` block (no edit needed there since it just inherits). Then rerun `lk agent create`.
-
-## Multi-agent handoff (teaser, no exercise)
-
-When one agent isn't enough:
-
-```python
-class TriageAgent(Agent):
-    @function_tool()
-    async def transfer_to_billing(self, context: RunContext):
-        """Transfer to a billing specialist."""
-        return BillingAgent(chat_ctx=self.chat_ctx), "Transferring to billing"
-
-class BillingAgent(Agent):
-    def __init__(self, chat_ctx: ChatContext):
-        super().__init__(
-            instructions="You are a billing specialist...",
-            chat_ctx=chat_ctx,
-        )
-```
-
-The triage agent's tool returns a new `Agent` instance plus a transition message. LiveKit handles the handoff. The `chat_ctx` propagates so the new agent sees what the user already said.
-
-That's the entire pattern. 30 lines.
+When you ship this for real visitors, you replace the hard-coded token in `config.js` with a server-side token endpoint that mints per-visitor tokens — see Going further below.
 
 ## Going further
 

@@ -65,14 +65,14 @@ Indicate below the planned number of days per course, the duration of each day, 
 
 There are now two practical architectures for voice AI. Speech-to-speech models handle audio in and out directly: the lowest-latency path between user audio and agent audio, but opaque on what happens between, hard to debug, and locked to one provider's model and pricing. A chained STT, LLM, TTS pipeline is the path many production deployments still take because each stage is independently swappable, debuggable, and instrumentable. The trade-off is you have to engineer the things speech-to-speech hides: turn detection that doesn't cut people off mid-sentence, retrieval that grounds answers without burning 300 to 900 ms on a network hop to a hosted vector DB, observability that lets you defend your latency budget under load, and a deploy story that doesn't end at `python agent.py` on your laptop.
 
-This hands-on course is the operational playbook for the chained-pipeline path on LiveKit Agents. You'll build a production-ready voice agent starting from your first spoken interaction on a laptop and ending with a deployed agent on LiveKit Cloud. You'll work through LiveKit's semantic end-of-turn model, function tools with graceful failure and barge-in protection, in-process retrieval via Moss (under 10 ms p99, zero network round-trips) on every turn, per-turn observability across the STT, LLM, TTS pipeline, and a single-command deploy. The organizing constraint throughout is an 800 ms first-byte budget you can defend under production load, not a demo number.
+This hands-on course is the operational playbook for the chained-pipeline path on LiveKit Agents. You'll build a production-ready voice agent starting from your first spoken interaction on a laptop and ending with a deployed agent on LiveKit Cloud. The agent you build is the same one running live at [heartbyte.io](https://heartbyte.io), the instructor's own voice agent. You'll work through LiveKit's semantic end-of-turn model, in-process retrieval via Moss (under 10 ms p99, zero network round-trips) on every turn, per-turn observability across the STT, LLM, TTS pipeline, and a single-command deploy. The organizing constraint throughout is an 800 ms first-byte budget you can defend under production load, not a demo number.
 
 Every exercise runs against real LiveKit infrastructure. The final `lk agent create` command ships your agent to LiveKit Cloud's global infrastructure in one step. By the end, you'll have a working voice agent and the operational playbook to ship it.
 
 **Course Objectives** 
 
 * Build a real-time voice agent on LiveKit Agents using LiveKit Inference, a unified API for STT, LLM, and TTS with no per-provider keys  
-* Solve the hard voice UX problems: semantic turn detection, false-interruption (backchannel) handling, and function tools the agent can call mid-conversation with graceful failure  
+* Upgrade from VAD-only silence timeouts to LiveKit's semantic end-of-turn model so the agent stops cutting people off mid-thought  
 * Ground every turn in your own data without breaking the conversational feel. Moss runs semantic search in-process (sub-10 ms) so RAG fits inside the natural turn-taking pause instead of adding the 300 to 900 ms of dead air a cloud vector DB would  
 * Instrument the STT → LLM → TTS pipeline with per-turn metrics, then deploy to LiveKit Cloud Agents with a single `lk agent create` command
 
@@ -121,8 +121,8 @@ Every exercise runs against real LiveKit infrastructure. The final `lk agent cre
 
 #### Section 1: Voice Agents and the First-Byte Problem (10 min)
 
-* Presentation: What a voice agent is and the first-byte budget (6 min): the STT, LLM, TTS pipeline with what plugs in at each stage (voice activity detection, semantic turn detection, function tools, retrieval, audio synthesis), why first-byte latency is the metric, the 800 ms target, and the course map (Hello Voice → Production UX → Grounding with Moss → Ship It)  
-* Demo: The finished system, a voice call to a Compass Coffee agent that retrieves from Moss, handles interruption, and demonstrates the 800 ms first-byte target (4 min)
+* Presentation: What a voice agent is and the first-byte budget (6 min): the STT, LLM, TTS pipeline with what plugs in at each stage (voice activity detection, semantic turn detection, retrieval, audio synthesis), why first-byte latency is the metric, the 800 ms target, and the course map (Hello Voice → Turn Detection → Grounding with Moss → Ship It)  
+* Demo: The finished system, a live voice call to the HeartByte orb at [heartbyte.io](https://heartbyte.io), the same agent you'll build, retrieving from Moss in-process and holding the 800 ms first-byte target (4 min)
 
 #### Section 2: Your First Voice Agent (20 min)
 
@@ -131,11 +131,10 @@ Every exercise runs against real LiveKit infrastructure. The final `lk agent cre
 * Exercise 2: Measure your first-byte latency (3 min): time the gap from your last word to first audio out, speak over the agent mid-reply, stay silent for a beat  
 * Q\&A (2 min)
 
-#### Section 3: Production Voice UX (25 min)
+#### Section 3: Turn Detection That Doesn't Cut People Off (15 min)
 
-* Presentation: The hard UX problems in voice AI (5 min): LiveKit's semantic end-of-turn model vs. VAD-only silence timeouts, false-interruption (backchannel) detection, and why function tools behave differently in voice than in text  
-* Exercise 3: Upgrade to semantic turn detection (8 min): swap in `MultilingualModel()`, test phrases with natural pauses ("Hmm, I think the order ID is... A100"), compare to VAD-only behavior  
-* Exercise 4: Add a function tool with graceful failure (10 min): define `@function_tool() get_order_status`, raise `ToolError` for not-found cases, use `context.disallow_interruptions()` to protect a state-mutating `place_order` call from accidental barge-in, and watch the `agent_false_interruption` event fire on backchannel utterances  
+* Presentation: Why VAD-only silence timeouts are wrong for voice (5 min): the difference between "they stopped making sound" and "they finished their thought," LiveKit's semantic end-of-turn model, and why this single change is the difference between an agent that feels rude and one that feels human  
+* Exercise 3: Upgrade to semantic turn detection (8 min): swap in `MultilingualModel()`, test phrases with natural pauses ("Hmm, the thing I want to ask is..."), compare side by side to VAD-only behavior, and watch the agent wait instead of barging in  
 * Q\&A (2 min)
 
 **Break (5 minutes)**
@@ -143,21 +142,21 @@ Every exercise runs against real LiveKit infrastructure. The final `lk agent cre
 #### Section 4: Grounding Agents in Real Data with Moss (30 min)
 
 * Presentation: Why voice agents need retrieval (5 min): why retrieve-as-tool patterns add an extra LLM round-trip you can't afford in voice, how hosted vector DBs add 300 to 900 ms of dead air per turn (Moss claims under 10 ms p99 in-process, zero network hops), and the "retrieve always, let the LLM decide what to use" principle  
-* Exercise 5: Build a Moss index for Compass Coffee (10 min): install the Moss SDK, run `build_index.py` against the 15-document knowledge base, query the index directly, inspect scores and tune `alpha` and `top_k`  
-* Exercise 6: Wire `on_user_turn_completed` for unconditional RAG (12 min): override the hook, query Moss on every user turn, inject results as a `system` message into `turn_ctx`, ask "What's your refund policy?" and "Tell me about your Ethiopian coffee" and watch grounded answers in real time  
+* Exercise 5: Build a Moss index for the HeartByte orb (10 min): run `build_index.py` against the HeartByte knowledge base (the same data file shipped at [heartbyte.io](https://heartbyte.io)), then use the included `query_index.py` CLI to inspect scores and feel what `alpha` and `top_k` change (run the same query with `--alpha 0.0` vs `--alpha 1.0` to see keyword-only vs semantic-only ordering)  
+* Exercise 6: Wire `on_user_turn_completed` for unconditional RAG (12 min): starting from the `agent_start.py` stub (the Moss client and turn detection are already wired), override the hook, query Moss on every user turn, inject results as a `system` message into `turn_ctx`, then ask "What is HeartByte?" and "Tell me about Abhi's three-phase method" and watch grounded answers in real time  
 * Q\&A (3 min)
 
 #### Section 5: Observability and Deployment (20 min)
 
 * Presentation: Observability for voice agents (5 min): per-turn latency breakdown across STT first byte, LLM time-to-first-token, TTS first audio chunk; session-level usage rollups; the principle of observability *before* deploy, not after  
-* Exercise 7: Wire production metrics (7 min): subscribe to `conversation_item_added` and read per-turn latency from `ChatMessage.metrics`, subscribe to `session_usage_updated` for cumulative model usage, register an `add_shutdown_callback` for an end-of-session summary  
-* Live walkthrough: Deploy with `lk agent create` (5 min): one command builds, ships, and registers your agent on LiveKit Cloud's global infrastructure; then open the included orb starter page from `orb/index.html` on `localhost`, paste a 24-hour LiveKit token into `config.js`, and tap the orb to talk to your cloud-deployed agent end to end. The same three pieces students will need to ship in production: static page + LiveKit Cloud + agent worker. For subsequent agent updates, `lk agent deploy` reads `livekit.toml` and rolls a new container without touching the dashboard secrets.  
+* Exercise 7: Wire production metrics (7 min): starting from the `agent_start.py` stub (the Section 4 grounded agent is already in place), subscribe to `conversation_item_added` and read per-turn latency from `ChatMessage.metrics`, subscribe to `session_usage_updated` for cumulative model usage, register an `add_shutdown_callback` for an end-of-session summary  
+* Live walkthrough: Deploy with `lk agent create` (5 min): one command builds, ships, and registers your agent on LiveKit Cloud's global infrastructure. The section directory is pre-staged as a self-contained deployable project (`Dockerfile` on Trixie to avoid the `inferedge-moss-core` wheel-compat trap, `pyproject.toml`, `uv.lock`, `.dockerignore`, `livekit.toml.example`) so the build hits the LiveKit Cloud cache fast and stays inside the demo window. Then open the included orb starter page from `orb/index.html` on `localhost`, paste a 24-hour LiveKit token into `config.js`, and tap the orb to talk to your cloud-deployed agent end to end. The same three pieces students will need to ship in production: static page + LiveKit Cloud + agent worker. For subsequent agent updates, `lk agent deploy` reads `livekit.toml` and rolls a new container without touching the dashboard secrets.  
 * Going-further callouts (3 min): wiring the visitor-facing half on Cloudflare Pages (a static HTML page using the LiveKit JavaScript Client SDK plus a Pages Function at `/api/token` that mints short-lived per-visitor LiveKit tokens with the Web Crypto API, signed against your `LIVEKIT_API_SECRET` set as a Pages env var; the front end fetches a fresh token on every tap, never sees the secret); the three security layers a public voice page needs (an Origin / `Sec-Fetch-Site` check on the token endpoint, per-visitor unique room names so one bad actor's session can't reach another visitor's, and Cloudflare WAF rate limiting at the edge); the audio-reactive UI state machine (`idle → connecting → listening → thinking → speaking`) driven from `AnalyserNode` taps on both the local mic and the remote agent track; multi-agent handoffs in 30 lines (`TriageAgent` → `BillingAgent`); telephony via `lk sip`; vision-enabled realtime models; photoreal avatars (Tavus/Anam); self-hosting LiveKit Server
 
-#### Final Q\&A and Wrap (10 min)
+#### Final Q\&A and Wrap (20 min)
 
 * Final poll: "What will you build first?" (2 min)  
-* Final Q\&A (8 min)
+* Final Q\&A (18 min)
 
 **Total: 2 hours (including 5 minutes of breaks)**
 

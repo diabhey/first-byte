@@ -2,7 +2,7 @@
 
 ## Goal
 
-Make the agent answer from real data. The agent in `agent.py` plays the voice assistant for **Compass Coffee**, a fictional single-origin coffee subscription service. The knowledge base is in `data/kb.json`.
+Make the agent answer from real data. The agent in `agent.py` is the HeartByte orb: the same voice agent running live at [heartbyte.io](https://heartbyte.io). The knowledge base in `data/kb.json` mirrors the production data file. You are literally building the production agent.
 
 ## Step 1: Build the index
 
@@ -10,25 +10,41 @@ Make the agent answer from real data. The agent in `agent.py` plays the voice as
 uv run python sections/03-grounding-moss/build_index.py
 ```
 
-This creates a Moss index named `MOSS_INDEX_NAME` (from your `.env`) with the 15 documents in `data/kb.json`. Re-runnable; it deletes the existing index first.
+This creates a Moss index named `MOSS_INDEX_NAME` (from your `.env`) with the documents in `data/kb.json`. Re-runnable; it deletes the existing index first.
 
 The script calls `client.create_index(name, docs, model_id="moss-minilm")`. The `model_id` argument selects the embedding model and is required by the Moss SDK. `moss-minilm` is the standard choice and what we use throughout this course. If you fork this script and drop the kwarg, the call will fail at runtime with a missing-argument error, not a typo: this is the most common gotcha students hit when they start tweaking.
 
-## Step 2: Run the grounded agent
+## Step 2: Inspect the index from the CLI (Exercise 5)
+
+Before wiring retrieval into the agent, see what Moss returns for a given question:
 
 ```bash
-uv run python sections/03-grounding-moss/agent.py dev
+uv run python sections/03-grounding-moss/query_index.py "What is HeartByte?"
+uv run python sections/03-grounding-moss/query_index.py "What is HeartByte?" --alpha 0.0
+uv run python sections/03-grounding-moss/query_index.py "What is HeartByte?" --alpha 1.0
+```
+
+Re-run with `--alpha 0.0` (keyword-only) vs `--alpha 1.0` (semantic-only) on the same query — the doc ordering tells you what `alpha` does. The agent code uses `alpha=0.8` and `top_k=5` (see [`agent.py`](./agent.py)); experiment with smaller `top_k` to see how much context is enough.
+
+## Step 3: Wire retrieval into the agent (Exercise 6)
+
+Open [`agent_start.py`](./agent_start.py). The Moss client is already set up; `on_user_turn_completed` is your TODO. Implement it, then run:
+
+```bash
+uv run python sections/03-grounding-moss/agent_start.py dev
 ```
 
 Connect via the [Agents Playground](https://agents-playground.livekit.io). Try:
 
-- "What's your refund policy?"
-- "Tell me about your Ethiopian coffee."
-- "Do you ship to the US?"
-- "Can I pause my subscription?"
-- "What's the difference between the Roaster and Cellar tiers?"
+- "What is HeartByte?"
+- "Tell me about Abhi's three-phase method."
+- "What's Abhi's background?"
+- "How do I get in touch?"
+- "What's the orb itself built on?"
 
 Watch your terminal for `[moss] injected N results` lines. Each user turn triggers a Moss query before the LLM sees anything.
+
+The finished reference is in [`agent.py`](./agent.py). Compare your implementation when done.
 
 ## What's the pattern
 
