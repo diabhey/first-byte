@@ -1,0 +1,16 @@
+[project]
+name = "first-byte-ship-it"
+version = "0.1.0"
+description = "Deployable course agent for Section 5 of Production Voice AI Agents with LiveKit"
+requires-python = ">=3.11"
+dependencies = [
+    "livekit-agents>=1.2.0",
+    "livekit-plugins-silero>=1.0.0",
+    "livekit-plugins-turn-detector>=1.0.0",
+    "moss>=1.0.0",
+    "python-dotenv>=1.0.0",
+    # onnxruntime 1.26 dropped macOS arm64 wheels; pin to the last version
+    # that still ships them (Silero VAD and the turn-detector plugin both
+    # depend on onnxruntime).
+    "onnxruntime<1.26",
+]

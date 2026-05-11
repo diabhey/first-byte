@@ -1,0 +1,13 @@
+# Template for the `livekit.toml` that `lk agent create` writes into this
+# directory on a successful deploy. Each student generates their own; the
+# real `livekit.toml` is gitignored at the repo root.
+#
+# After your deploy succeeds, copy the auto-generated `livekit.toml` next
+# to this file (do not commit it). For subsequent updates, `lk agent
+# deploy` reads `livekit.toml` and rolls a new container.
+
+[project]
+  subdomain = "YOUR-PROJECT-XXXXXX"
+
+[agent]
+  id = "CA_XXXXXXXXXX"

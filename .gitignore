@@ -40,3 +40,7 @@ Thumbs.db
 
 # LiveKit
 .livekit/
+
+# Per-student `lk agent create` output. Each student generates their own
+# with their project subdomain + agent ID; the .example file is committed.
+sections/04-ship-it/livekit.toml
