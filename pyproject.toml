@@ -12,6 +12,10 @@ dependencies = [
     "livekit-plugins-turn-detector>=1.0.0",
     "moss>=1.0.0",
     "python-dotenv>=1.0.0",
+    # onnxruntime 1.26 dropped macOS arm64 wheels; pin to the last version
+    # that still ships them. Silero VAD and the turn-detector plugin both
+    # depend on onnxruntime transitively. Affects students on M-series Macs.
+    "onnxruntime<1.26",
 ]
 
 [build-system]
