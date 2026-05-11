@@ -2,7 +2,7 @@
 
 ## Goal
 
-Wire production observability, then deploy the agent to LiveKit Cloud Agents with a single command. By the end of this section your agent runs on the public internet against a global edge.
+Wire production observability, then deploy the agent to LiveKit Cloud Agents with a single command. By the end of this section your agent runs on the public internet against LiveKit's global network and infrastructure.
 
 ## Step 1: Run locally with metrics
 
@@ -79,6 +79,7 @@ That's the entire pattern. 30 lines.
 
 ## Going further
 
+- **Custom visitor-facing frontend**: the Agents Playground is for development. To put a real user in front of your agent on your own site, you need three things: a token endpoint (Node, Python, or Edge function that mints a LiveKit access token), the [LiveKit JS SDK](https://docs.livekit.io/reference/client-sdk-js/) (`livekit-client`) to join a room from the browser, and a UI that handles mic permissions and the connecting/listening/speaking states. For a polished feel, drive a canvas or SVG animation from the agent's audio track using the Web Audio `AnalyserNode`: a simple state machine (`idle → connecting → listening → thinking → speaking`) plus per-frame RMS sampling gives you the audio-reactive orb pattern most production voice products ship.
 - **Telephony**: `lk sip` to wire a phone number. Buy a DID via LiveKit Phone Numbers in the Cloud dashboard, set up a dispatch rule, your agent picks up real calls. See [docs.livekit.io/sip](https://docs.livekit.io/sip/).
 - **Vision**: Gemini Live and OpenAI's realtime models support video input. Pass a video track and ask the agent what it sees.
 - **Avatars**: Tavus and Anam render a photorealistic talking head. Plug in via the avatar plugins.

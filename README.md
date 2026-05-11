@@ -80,7 +80,7 @@ cd sections/04-ship-it
 lk agent create
 ```
 
-That single command builds, ships, and registers your agent worker on LiveKit's global infrastructure. Set your secrets in the LiveKit Cloud dashboard, then connect the Playground to the deployed agent's public endpoint.
+That single command builds, ships, and registers your agent worker on LiveKit's global network and infrastructure. Set your secrets in the LiveKit Cloud dashboard, then connect the Playground to the deployed agent's public endpoint.
 
 ## Resources
 

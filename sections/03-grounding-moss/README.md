@@ -12,6 +12,8 @@ uv run python sections/03-grounding-moss/build_index.py
 
 This creates a Moss index named `MOSS_INDEX_NAME` (from your `.env`) with the 15 documents in `data/kb.json`. Re-runnable; it deletes the existing index first.
 
+The script calls `client.create_index(name, docs, model_id="moss-minilm")`. The `model_id` argument selects the embedding model and is required by the Moss SDK. `moss-minilm` is the standard choice and what we use throughout this course. If you fork this script and drop the kwarg, the call will fail at runtime with a missing-argument error, not a typo: this is the most common gotcha students hit when they start tweaking.
+
 ## Step 2: Run the grounded agent
 
 ```bash
@@ -52,8 +54,9 @@ Three things to internalize:
 ## Why Moss specifically
 
 - **In-process semantic search**, not a hosted vector DB. The index ships with your worker. No external retrieval hop adds 50 to 200 ms per turn.
-- **`alpha=0.8`** balances dense semantic search with sparse keyword matching. Higher alpha favors meaning over exact word match. Tune to your dataset.
-- **`top_k=5`** keeps the injected context short. Voice answers shouldn't reference 20 documents.
+- **`alpha=0.8`** balances dense semantic search with sparse keyword matching. `alpha=0` is pure BM25 keyword match, `alpha=1` is pure semantic. The SDK default is `0.5`. Higher alpha favors meaning over exact word match; tune to your dataset.
+- **`top_k=5`** keeps the injected context short. Voice answers shouldn't reference 20 documents. The SDK default is `3`.
+- **`await client.load_index(name)`** at agent startup (see `agent.py`) pre-loads the index in-process for sub-10 ms queries. Without it, the first query pays a cold-load tax.
 
 ## Concepts introduced
 
