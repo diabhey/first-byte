@@ -14,7 +14,7 @@ const CONFIG = {
 
     // A short-lived LiveKit access token. Generate one:
     //   $ lk token create \
-    //       --room compass-coffee \
+    //       --room heartbyte-orb \
     //       --identity orb-visitor \
     //       --valid-for 24h
     // Paste the eyJ... string here.
@@ -23,7 +23,7 @@ const CONFIG = {
     // The LiveKit room the orb joins. The agent dispatches to this room
     // automatically when a participant joins. Keep as-is unless you also
     // change the agent's expected room.
-    ROOM: 'compass-coffee',
+    ROOM: 'heartbyte-orb',
   },
 };
 

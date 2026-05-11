@@ -13,7 +13,7 @@ first-byte/
 ├── preflight.py            # Verifies your setup before class
 ├── sections/
 │   ├── 01-hello-voice/     # First voice agent on LiveKit Inference
-│   ├── 02-production-ux/   # Turn detection + function tools
+│   ├── 02-production-ux/   # Semantic turn detection
 │   ├── 03-grounding-moss/  # RAG via on_user_turn_completed
 │   └── 04-ship-it/         # Observability + lk agent create deploy
 └── orb/                    # Visitor-facing webpage (Three.js orb, LiveKit JS SDK).

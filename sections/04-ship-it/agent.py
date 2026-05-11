@@ -43,12 +43,12 @@ from moss import MossClient, QueryOptions
 load_dotenv()
 
 
-class CompassAgent(Agent):
+class HeartByteAgent(Agent):
     def __init__(self, moss_client: MossClient, index_name: str) -> None:
         super().__init__(
             instructions=(
-                "You are the voice assistant for Compass Coffee, a single-origin "
-                "coffee subscription service. Answer questions using only the "
+                "You are the voice mind of HeartByte, the working studio of "
+                "Abhimanyu Selvan (Abhi). Answer questions using only the "
                 "context provided in system messages. If the context does not "
                 "contain the answer, say so plainly. Keep replies short, two or "
                 "three sentences. Speak conversationally; do not read URLs, "
@@ -60,7 +60,11 @@ class CompassAgent(Agent):
 
     async def on_enter(self) -> None:
         await self.session.generate_reply(
-            instructions="Greet the caller as Compass Coffee and ask how you can help.",
+            instructions=(
+                "Greet the visitor briefly as the HeartByte orb. One sentence. "
+                "Invite them to ask about HeartByte, Abhi's work, or how to "
+                "get in touch."
+            ),
         )
 
     async def on_user_turn_completed(
@@ -146,7 +150,7 @@ async def entrypoint(ctx: JobContext) -> None:
 
     ctx.add_shutdown_callback(_log_session_summary)
 
-    await session.start(agent=CompassAgent(moss, index_name), room=ctx.room)
+    await session.start(agent=HeartByteAgent(moss, index_name), room=ctx.room)
 
 
 if __name__ == "__main__":

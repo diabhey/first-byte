@@ -6,7 +6,7 @@ two halves meeting at LiveKit Cloud:
 
 ```
 browser <── WebRTC ──>  LiveKit Cloud  ── dispatch ──>  agent worker
-(orb)                   room "compass-coffee"          (your hb-agent / Compass)
+(orb)                   room "heartbyte-orb"          (your deployed agent)
 ```
 
 You'll run this locally during class to test against the agent you've just
@@ -34,14 +34,14 @@ Then edit `config.js`:
 
   ```bash
   lk token create \
-    --room compass-coffee \
+    --room heartbyte-orb \
     --identity orb-visitor \
     --valid-for 24h
   ```
 
   Paste the printed `eyJ...` string.
 
-- `ROOM`: leave as `compass-coffee` (must match what your agent dispatches
+- `ROOM`: leave as `heartbyte-orb` (must match what your agent dispatches
   to, which it does by default).
 
 `config.js` is gitignored — never commit your token.
@@ -58,9 +58,9 @@ Then open <http://localhost:8000>.
 
 ## Step 3 — tap and talk
 
-Tap the orb, grant the mic permission, ask about a coffee order. Your
+Tap the orb, grant the mic permission, ask "What is HeartByte?" Your
 voice goes over WebRTC to your LiveKit Cloud project; LiveKit dispatches
-your agent worker to room `compass-coffee`; the agent does STT → Moss
+your agent worker to room `heartbyte-orb`; the agent does STT → Moss
 retrieval → LLM → TTS and the response streams back. The orb's color and
 state indicator should track listening → thinking → speaking.
 
@@ -89,7 +89,7 @@ add for production, in increasing effort:
    with the Web Crypto API). The orb fetches `/api/token` on tap and the
    secret lives in Pages env vars, not in the browser.
 2. **Per-visitor unique rooms.** Have the token endpoint return a
-   `compass-coffee-<uuid>` room name per visitor so a bad actor in one
+   `heartbyte-orb-<uuid>` room name per visitor so a bad actor in one
    room can't disrupt other visitors. LiveKit Cloud Agents auto-dispatch
    one worker job per new room.
 3. **Edge rate limiting.** A Cloudflare WAF rule on the token endpoint

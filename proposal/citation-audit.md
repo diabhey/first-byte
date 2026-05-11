@@ -143,14 +143,6 @@ This is not a course-claim defect, it's a tooling-default issue that students wi
 |---|---|---|
 | Semantic end-of-utterance model exists | ✅ | LK-TURN: *"adds conversational context as an additional signal to voice activity detection (VAD) to improve end-of-turn detection."* |
 
-> "function tools with graceful failure and barge-in protection"
-
-| Claim | Status | Source |
-|---|---|---|
-| `@function_tool` decorator | ✅ | LK-TOOLS: *"Add tools to your agent class with the `@function_tool` decorator"* |
-| `ToolError` for graceful failure | ✅ | LK-TOOLS: *"Raise the `ToolError` exception to return an error to the LLM in place of a response."* |
-| `disallow_interruptions()` blocks barge-in | ✅ | LK-TOOLS: *"call `context.disallow_interruptions()` at the start of your tool to ensure user speech won't interrupt the agent's task."* |
-
 > "in-process retrieval via Moss (under 10 ms p99, zero network round-trips) on every turn"
 
 | Claim | Status | Source |
@@ -203,13 +195,12 @@ This is not a course-claim defect, it's a tooling-default issue that students wi
 | Shorthand strings (e.g., `deepgram/nova-3:en`) | ✅ | LK-INFERENCE: *"As a shortcut, you can pass a model descriptor string directly"* + `stt="deepgram/nova-3:en"`. |
 | "No per-provider keys needed" | ✅ | LK-INFERENCE: *"LiveKit Inference is included in LiveKit Cloud, and does not require any additional plugins"* + supported providers listed (OpenAI, Google, Deepgram, Cartesia, ElevenLabs, AssemblyAI, etc.). |
 
-> "Solve the hard voice UX problems: semantic turn detection, false-interruption (backchannel) handling, and function tools the agent can call mid-conversation with graceful failure"
+> "Upgrade from VAD-only silence timeouts to LiveKit's semantic end-of-turn model so the agent stops cutting people off mid-thought"
 
 | Claim | Status | Source |
 |---|---|---|
 | Semantic turn detection (`MultilingualModel`) | ✅ | LK-TURN: documents `MultilingualModel()` with 14 supported languages and the conversational-context behavior. |
-| `agent_false_interruption` event | ✅ | LK-EVENTS: *"user speech that initially appeared to interrupt the agent, but is determined not to be a true interruption."* |
-| Function tools mid-conversation with graceful failure | ✅ | LK-TOOLS (see above). |
+| VAD-only timeouts as the problem being solved | ✅ | LK-TURN: *"a user might say 'I need to think about that for a moment' and then take a long pause. The user has more to say but a VAD-only system interrupts them anyway."* |
 
 > "Ground responses in real data using Moss in-process semantic search (under 10 ms p99, zero network round-trips) via the `on_user_turn_completed` hook"
 
@@ -303,15 +294,13 @@ Editorial.
 
 ---
 
-### Section 3 — Production Voice UX
+### Section 3 — Turn Detection That Doesn't Cut People Off
 
-> "Presentation: The hard UX problems in voice AI (10 min): LiveKit's semantic end-of-utterance model vs. VAD-only silence timeouts, false-interruption (backchannel) detection..."
+> "Presentation: Why VAD-only silence timeouts are wrong for voice (5 min): the difference between 'they stopped making sound' and 'they finished their thought,' LiveKit's semantic end-of-turn model..."
 
 | Claim | Status | Source |
 |---|---|---|
 | Semantic end-of-utterance vs VAD-only | ✅ | LK-TURN: *"a user might say 'I need to think about that for a moment' and then take a long pause. The user has more to say but a VAD-only system interrupts them anyway."* |
-| `agent_false_interruption` event | ✅ | LK-EVENTS. |
-| "Function tools behave differently in voice than in text" | ✗ | Instructor framing. Defensible (LK-TOOLS shows voice-specific patterns like `disallow_interruptions`) but not a direct quote. |
 
 > "Exercise 3: Upgrade to semantic turn detection... swap in `MultilingualModel()`"
 
@@ -319,15 +308,9 @@ Editorial.
 |---|---|---|
 | `MultilingualModel()` | ✅ | LK-TURN. |
 | **Repo passes it as `turn_detection=...` directly on AgentSession; current LK-VOICE-AI docs nest it as `turn_handling=TurnHandlingOptions(turn_detection=...)`.** | ⚠ | Finding 2. Either pattern likely still works, but the docs have moved to the nested form. |
-| Natural-pause test phrase ("Hmm, I think the order ID is... A100") | 📁 | Repo example. |
+| Natural-pause test phrase ("Hmm, the thing I want to ask is...") | 📁 | Repo example. |
 
-> "Exercise 4: Add a function tool with graceful failure"
-
-All four elements (`@function_tool`, `get_order_status`, `ToolError`, `disallow_interruptions`, `place_order`) verified ✅ via LK-TOOLS; specific function names (`get_order_status`, `place_order`) are 📁 repo.
-
-> "Live coding: Wire false-interruption tracking — subscribe to the `agent_false_interruption` event..."
-
-✅ LK-EVENTS confirms the event. "uh-huh" as the backchannel example is 📁 repo.
+**Removed in 2026-05-11 simplification:** Exercise 4 (function tools / `ToolError` / `disallow_interruptions`) and the `agent_false_interruption` live-coding were cut from §3 so the course matches what's actually shipped in production at heartbyte.io ([hb-agent](https://github.com/heartbyte-io/hb-agent) is read-only, no function tools). The vendor-verified citations for those APIs (LK-TOOLS, LK-EVENTS) remain valid — they just no longer back any course claim.
 
 ---
 
@@ -342,27 +325,28 @@ All four elements (`@function_tool`, `get_order_status`, `ToolError`, `disallow_
 | Moss under 10 ms p99 in-process, zero network hops | ✅ | MOSS-VOICE. |
 | "Retrieve always, let the LLM decide what to use" principle | ✗ | Instructor framing. (The principle is the course's framing of the unconditional-retrieval pattern that LK-NODES does call out as a common RAG use of `on_user_turn_completed`.) Defensible. |
 
-> "Exercise 5: Build a Moss index for Compass Coffee..."
+> "Exercise 5: Build a Moss index for the HeartByte orb..."
 
 | Claim | Status | Source |
 |---|---|---|
 | Moss SDK (`MossClient`) | ✅ | MOSS-LLMS: *"MossClient: Semantic search client for vector similarity operations"* (Python). |
 | `build_index.py` script | 📁 | Repo file. Call shapes inside the script are vendor-verified (next four rows). |
+| `query_index.py` CLI for inspecting scores / tuning alpha | 📁 | Repo file (`sections/03-grounding-moss/query_index.py`). Wraps `MossClient.query` with argparse so students can re-run the same question with `--alpha 0.0` (keyword-only) vs `--alpha 1.0` (semantic-only) and see the doc ordering change. Added so Exercise 5's "query the index directly" step has a concrete tool instead of a one-liner REPL. |
 | `create_index(name, [DocumentInfo(...)], model_id="moss-minilm")` call shape | ✅ | MOSS-LLMS documents `create_index` taking an index name, a list of `DocumentInfo(id, text, metadata)` records, and the required `model_id` argument. `moss-minilm` is listed as a supported embedding model. Repo Section 3 README (commit 06dff7e) calls this out explicitly so students don't drop the kwarg. |
-| Incremental ingestion via `add_docs` + `MutationOptions(upsert=True)` | ✅ | MOSS-LLMS documents `add_docs` and the `MutationOptions(upsert=True)` pattern for incremental updates. Not used in the course flow (the course rebuilds the 15-doc index in one shot) but verified for completeness. |
-| 15-document knowledge base | 📁 | Repo `data/kb.json`. |
+| Incremental ingestion via `add_docs` + `MutationOptions(upsert=True)` | ✅ | MOSS-LLMS documents `add_docs` and the `MutationOptions(upsert=True)` pattern for incremental updates. Not used in the course flow (the course rebuilds the index in one shot) but verified for completeness. |
+| HeartByte knowledge base (the same data file shipped at heartbyte.io) | 📁 | Repo `data/kb.json` mirrors `heartbyte-io/hb-agent/data/kb.json`. The course example is the production data, not a fictional stand-in. |
 | Alpha and top_k as tunable params | ✅ | MOSS-LLMS confirms `top_k` (default 3) and `alpha` (default 0.5) on `QueryOptions`. *"Hybrid search weighting. `0.0` = keyword only, `1.0` = semantic only."* |
-| Compass Coffee brand | 📁 | Repo (fictional brand for the course). |
 
 > "Exercise 6: Wire `on_user_turn_completed` for unconditional RAG..."
 
 | Claim | Status | Source |
 |---|---|---|
+| Starting-point stub `agent_start.py` | 📁 | Repo file (`sections/03-grounding-moss/agent_start.py`). Has the Moss client setup, index pre-load, turn detection, and an empty `on_user_turn_completed` placeholder so students implement only the hook body during the 12 min budget. The finished version remains at `agent.py`. |
 | Override `on_user_turn_completed` | ✅ | LK-NODES: *"Override this method to modify the content of the turn, cancel the agent's reply, or perform other actions."* |
 | Inject results as `system` message into `turn_ctx` | ✅ | LK-NODES signature: `turn_ctx: ChatContext`. ChatContext supports message injection. |
 | `client.query(index_name, query, QueryOptions(...))` returns object with `.docs` each having `.text` | ✅ | MOSS-LLMS documents the `query` return shape: results expose a `.docs` collection where each entry exposes `.text` (and `.score`, `.metadata`). Repo `sections/03-grounding-moss/agent.py` iterates `results.docs` and reads `d.text` directly. |
 | `load_index` for in-process pre-loading at worker startup | ✅ | MOSS-LLMS documents `load_index` as the call that pulls the index into the agent process so subsequent `query` calls are local. Repo `sections/03-grounding-moss/agent.py` calls `await moss.load_index(index_name)` in the entrypoint before `session.start`. |
-| Exact queries ("refund policy", "Ethiopian coffee") | 📁 | Repo. |
+| Exact queries ("What is HeartByte?", "Tell me about Abhi's three-phase method") | 📁 | Repo. Both questions return grounded answers against `data/kb.json` (see the `what-is-heartbyte` and `abhi-method` documents). |
 
 > "Live coding: Tune retrieval for voice"
 
@@ -389,6 +373,7 @@ All four elements (`@function_tool`, `get_order_status`, `ToolError`, `disallow_
 
 | Claim | Status | Source |
 |---|---|---|
+| Starting-point stub `agent_start.py` | 📁 | Repo file (`sections/04-ship-it/agent_start.py`). Section 4's grounded HeartByteAgent is fully in place; only the three event handlers + `add_shutdown_callback` are TODOs. Keeps the 7-min budget honest. |
 | Event subscriptions: `conversation_item_added`, `session_usage_updated` | ✅ | LK-EVENTS. |
 | Per-turn metric access via `ChatMessage.metrics` dict | ✅ | LK-EVENTS quotes `m.get("e2e_latency")` pattern verbatim. |
 | `add_shutdown_callback` on JobContext | ❓ | I did not find a vendor doc page explicitly documenting this method. It is widely used in LiveKit Agents examples, so it almost certainly exists, but I could not pull an authoritative quote in this audit. |
@@ -401,6 +386,7 @@ All four elements (`@function_tool`, `get_order_status`, `ToolError`, `disallow_
 | Command builds container / registers worker / dispatches to rooms | 📁 | Repo claim only. |
 | "LiveKit Cloud's global infrastructure" | ✅ | Phrasing now matches LK-DEPLOY. Resolved in both proposal and repo Section 4 README (06dff7e). |
 | Set Moss secrets in Cloud dashboard | ✅ | LK-DEPLOY mentions secrets management: *"LiveKit Cloud encrypts and securely injects these values into your agent containers at runtime."* |
+| Pre-staged `Dockerfile` / `pyproject.toml` / `uv.lock` / `.dockerignore` / `livekit.toml.example` | 📁 | Repo (`sections/04-ship-it/`). The Dockerfile uses `python:3.13-slim-trixie` (glibc 2.38) rather than `lk agent create`'s Bookworm default (glibc 2.36), which silently fails to install `inferedge-moss-core` (the wheel is `manylinux_2_38_x86_64`). Pre-staging avoids the 5-min live debug. Provenance: copied from hb-agent commit `3b8e65f` which captured the original fix. |
 
 > "Teaser: Multi-agent handoffs in 30 lines..."
 
