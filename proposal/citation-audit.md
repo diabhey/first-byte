@@ -347,7 +347,9 @@ All four elements (`@function_tool`, `get_order_status`, `ToolError`, `disallow_
 | Claim | Status | Source |
 |---|---|---|
 | Moss SDK (`MossClient`) | ✅ | MOSS-LLMS: *"MossClient: Semantic search client for vector similarity operations"* (Python). |
-| `build_index.py` script | 📁 | Repo file. |
+| `build_index.py` script | 📁 | Repo file. Call shapes inside the script are vendor-verified (next four rows). |
+| `create_index(name, [DocumentInfo(...)], model_id="moss-minilm")` call shape | ✅ | MOSS-LLMS documents `create_index` taking an index name, a list of `DocumentInfo(id, text, metadata)` records, and the required `model_id` argument. `moss-minilm` is listed as a supported embedding model. Repo Section 3 README (commit 06dff7e) calls this out explicitly so students don't drop the kwarg. |
+| Incremental ingestion via `add_docs` + `MutationOptions(upsert=True)` | ✅ | MOSS-LLMS documents `add_docs` and the `MutationOptions(upsert=True)` pattern for incremental updates. Not used in the course flow (the course rebuilds the 15-doc index in one shot) but verified for completeness. |
 | 15-document knowledge base | 📁 | Repo `data/kb.json`. |
 | Alpha and top_k as tunable params | ✅ | MOSS-LLMS confirms `top_k` (default 3) and `alpha` (default 0.5) on `QueryOptions`. *"Hybrid search weighting. `0.0` = keyword only, `1.0` = semantic only."* |
 | Compass Coffee brand | 📁 | Repo (fictional brand for the course). |
@@ -358,6 +360,8 @@ All four elements (`@function_tool`, `get_order_status`, `ToolError`, `disallow_
 |---|---|---|
 | Override `on_user_turn_completed` | ✅ | LK-NODES: *"Override this method to modify the content of the turn, cancel the agent's reply, or perform other actions."* |
 | Inject results as `system` message into `turn_ctx` | ✅ | LK-NODES signature: `turn_ctx: ChatContext`. ChatContext supports message injection. |
+| `client.query(index_name, query, QueryOptions(...))` returns object with `.docs` each having `.text` | ✅ | MOSS-LLMS documents the `query` return shape: results expose a `.docs` collection where each entry exposes `.text` (and `.score`, `.metadata`). Repo `sections/03-grounding-moss/agent.py` iterates `results.docs` and reads `d.text` directly. |
+| `load_index` for in-process pre-loading at worker startup | ✅ | MOSS-LLMS documents `load_index` as the call that pulls the index into the agent process so subsequent `query` calls are local. Repo `sections/03-grounding-moss/agent.py` calls `await moss.load_index(index_name)` in the entrypoint before `session.start`. |
 | Exact queries ("refund policy", "Ethiopian coffee") | 📁 | Repo. |
 
 > "Live coding: Tune retrieval for voice"
