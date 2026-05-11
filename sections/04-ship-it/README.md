@@ -50,9 +50,39 @@ After deploy:
 
 1. Open [cloud.livekit.io](https://cloud.livekit.io) and find your new agent.
 2. Set environment variables in the agent's settings: `MOSS_PROJECT_ID`, `MOSS_PROJECT_KEY`, `MOSS_INDEX_NAME`. (The LiveKit and OpenAI/Deepgram/Cartesia credentials are handled by LiveKit Inference automatically.)
-3. Note the agent ID. Connect from the Agents Playground or any LiveKit room and your deployed agent will dispatch.
+3. Note the agent ID.
 
 That's it. No Kubernetes manifest, no SSL cert wrangling.
+
+## Step 3: Talk to your deployed agent from a local orb page
+
+The Agents Playground is fine for poking the worker, but the course ships a small visitor-facing front end you can run locally to feel what production looks like. It's at the repo root in [`../../orb/`](../../orb/).
+
+```bash
+cd ../../orb
+cp config.template.js config.js
+```
+
+Edit `config.js` and fill in three values:
+
+- `URL`: your LiveKit Cloud `wss://...livekit.cloud` (same one in your `.env`)
+- `TOKEN`: a 24h LiveKit access token for room `compass-coffee`:
+  ```bash
+  lk token create --room compass-coffee --identity orb-visitor --valid-for 24h
+  ```
+- `ROOM`: leave as `compass-coffee` (default)
+
+Then serve the page:
+
+```bash
+python3 -m http.server 8000
+```
+
+Open <http://localhost:8000> → tap the orb → grant the mic → ask about a coffee order. Your browser connects over WebRTC to your LiveKit Cloud project; LiveKit dispatches your deployed worker to the room; the agent does STT → Moss retrieval → LLM → TTS and the reply streams back. The orb's color and state indicator track listening → thinking → speaking. Tap the orb during a live session to disconnect.
+
+That's the full architecture in three pieces: static webpage (front end), LiveKit Cloud (signaling + dispatch), your agent worker (the brain). All three meet at the room name in your token.
+
+When you ship this for real visitors (`heartbyte.io` style), you replace the local token in `config.js` with a server-side token endpoint that mints per-visitor tokens — see Going further below.
 
 > **Heads-up about the auto-generated Dockerfile.** `lk agent create` will drop a starter Dockerfile in your directory using `ghcr.io/astral-sh/uv:python3.13-bookworm-slim` as the base. Debian Bookworm ships glibc 2.36; `inferedge-moss-core` (the binary behind the `moss` package) only ships wheels for `manylinux_2_38_x86_64` on Linux x86_64. The build will fail at `uv sync --locked`. Fix: swap the base to `python:3.13-slim-trixie` (Debian 13, glibc 2.38) and copy the `uv` binary from astral's image:
 >

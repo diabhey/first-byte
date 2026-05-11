@@ -16,9 +16,13 @@ first-byte/
 │   ├── 02-production-ux/   # Turn detection + function tools
 │   ├── 03-grounding-moss/  # RAG via on_user_turn_completed
 │   └── 04-ship-it/         # Observability + lk agent create deploy
+└── orb/                    # Visitor-facing webpage (Three.js orb, LiveKit JS SDK).
+                            # Run locally to talk to your deployed agent.
 ```
 
-Each section is a self-contained `agent.py` you run with `uv run python sections/<section>/agent.py dev`. They build on each other, but each is also runnable standalone.
+Each `sections/` directory is a self-contained `agent.py` you run with `uv run python sections/<section>/agent.py dev`. They build on each other, but each is also runnable standalone.
+
+The `orb/` directory is the front-end half — a single HTML page using the LiveKit JS SDK and a Three.js sphere. After you've deployed your agent on LiveKit Cloud in Section 5, you'll serve this page locally (`python3 -m http.server`) and tap the orb to talk to your cloud agent. See `orb/README.md` for the three-step setup.
 
 ## Pre-class setup
 
