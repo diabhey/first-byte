@@ -64,28 +64,28 @@ The current LK-VOICE-AI quickstart documents a different pattern using `AgentSer
 
 **Recommended action:** Decide whether to update the repo to match the current docs, or explicitly call out in class that there are multiple supported entrypoint patterns and you're teaching the worker-based one for a stated reason.
 
-### Finding 3: `lk agent create` is in the course repo but I could NOT locate it in vendor docs
+### Finding 3: ✅ RESOLVED — `lk agent create` confirmed working
 
-The course's `sections/04-ship-it/README.md:33-36` documents the deploy command as:
+**Original concern:** `lk agent create` was documented in the course repo's `sections/04-ship-it/README.md` but the public LiveKit CLI README, the CLI docs index, and `docs.livekit.io/reference/developer-tools/livekit-cli/agent.md` all returned 404 or did not list the command. I could not verify it existed in vendor docs.
 
-```bash
-lk agent create
-```
+**Resolution (2026-05-11):** the instructor ran `lk agent create` against the hb-agent repo (`/Users/niall/code/heartbyte-io/hb-agent/`, a real-product instantiation of the course's Section 4 stack). The command exists. It:
 
-This is the deploy story the entire Section 5 (and parts of the Course Description) depends on.
+1. Reads `.env` for `LIVEKIT_*` secrets.
+2. Auto-detects the agent language (`python.uv` for this project).
+3. Prompts for the agent entrypoint file (`agent.py` vs `build_index.py`).
+4. Generates a `Dockerfile` and `.dockerignore`.
+5. Builds the container remotely, registers it as a LiveKit Cloud Agent worker, and assigns an agent ID. The `livekit.toml` it writes back records the project subdomain and the agent ID for subsequent `lk agent` commands.
 
-Sources searched:
-- LK-CLI overview page: mentions "Create, deploy, update, and monitor agents on LiveKit Cloud" but does not list the specific command syntax
-- LK-CLI-GH README: lists `lk perf agent-load-test`, `lk app create`, but **no `lk agent create`**
-- `docs.livekit.io/reference/developer-tools/livekit-cli/agent.md`: returns **HTTP 404**
-- `docs.livekit.io/agents/start/agent-deployment/`: returns **HTTP 404**
+The deploy command is therefore real and matches the course's documentation. The audit row in the Course Schedule, Section 5 ("Live walkthrough: Deploy with `lk agent create`") is reclassified from ❓ to ✅.
 
-**Possibilities:**
-- `lk agent create` is a newer CLI command not yet in the public README
-- It's a feature behind a LiveKit Cloud Agents preview/beta
-- The repo's command name is wrong and the actual current command is different (e.g., `lk app create` or `lk cloud agent ...`)
+**New gotcha surfaced during the first hb-agent deploy** (now documented in `sections/04-ship-it/README.md` and `reminder.txt`):
 
-**Recommended action:** Before this proposal is submitted, run `lk agent --help` against the current CLI binary and verify `create` is listed. If it isn't, the course's deploy story needs a correction.
+- The auto-generated Dockerfile uses `ghcr.io/astral-sh/uv:python3.13-bookworm-slim` (Debian 12, glibc 2.36).
+- `inferedge-moss-core==0.11.0` only ships `manylinux_2_38_x86_64` wheels for Linux x86_64.
+- The first build fails at `uv sync --locked` with a "no wheel for this platform" error from uv.
+- Fix: swap the base image to `python:3.13-slim-trixie` (glibc 2.38) and copy the `uv` binary from astral's image. After the swap the build succeeds. hb-agent commit `3b8e65f` captures the fix.
+
+This is not a course-claim defect, it's a tooling-default issue that students will hit when they reach Step 2 of Section 5. The Section 4 README in `first-byte` now includes a "Heads-up about the auto-generated Dockerfile" callout under `## Step 2: Deploy`.
 
 ---
 
@@ -169,7 +169,7 @@ Sources searched:
 
 > "a single-command deploy"
 
-❓ See Finding 3. The repo says `lk agent create`. Not located in vendor docs.
+✅ Finding 3 resolved. `lk agent create` confirmed working by live deploy of the hb-agent project on 2026-05-11.
 
 > "800 ms first-byte budget you can defend under production load, not a demo number"
 
@@ -188,7 +188,7 @@ Sources searched:
 
 | Claim | Status | Source |
 |---|---|---|
-| `lk agent create` | ❓ | Finding 3. |
+| `lk agent create` | ✅ | Confirmed working by live deploy (hb-agent commit `1eee9e4` carries the `livekit.toml` with the assigned agent ID). See Finding 3 (resolved). |
 | LiveKit Cloud's global infrastructure | ✅ | Proposal now matches LK-DEPLOY's "global network and infrastructure" phrasing. Repo top-level README also updated in commit 06dff7e. |
 
 ---
@@ -220,7 +220,7 @@ All four sub-claims ✅ via LK-NODES + MOSS-VOICE + MOSS-LLMS (covered above).
 | Claim | Status | Source |
 |---|---|---|
 | Per-turn metrics | ✅ | LK-EVENTS. Repo updated to current pattern (`conversation_item_added` + `ChatMessage.metrics`). See Finding 1 (resolved). |
-| `lk agent create` | ❓ | Finding 3. |
+| `lk agent create` | ✅ | Confirmed working by live deploy (hb-agent commit `1eee9e4` carries the `livekit.toml` with the assigned agent ID). See Finding 3 (resolved). |
 
 ---
 
@@ -397,7 +397,7 @@ All four elements (`@function_tool`, `get_order_status`, `ToolError`, `disallow_
 
 | Claim | Status | Source |
 |---|---|---|
-| `lk agent create` | ❓ | **Finding 3.** |
+| `lk agent create` | ✅ | Finding 3 resolved. Live deploy succeeded; see hb-agent commit `1eee9e4`. |
 | Command builds container / registers worker / dispatches to rooms | 📁 | Repo claim only. |
 | "LiveKit Cloud's global infrastructure" | ✅ | Phrasing now matches LK-DEPLOY. Resolved in both proposal and repo Section 4 README (06dff7e). |
 | Set Moss secrets in Cloud dashboard | ✅ | LK-DEPLOY mentions secrets management: *"LiveKit Cloud encrypts and securely injects these values into your agent containers at runtime."* |
@@ -464,7 +464,7 @@ In priority order:
 
 1. ✅ **Done.** Deprecated metrics API replaced in repo and proposal (see Finding 1 above). Recommend running `uv run python sections/04-ship-it/agent.py dev` once to confirm the new event handlers fire correctly.
 
-2. **Verify `lk agent create` exists** (Finding 3). Run `lk agent --help`. If the command isn't there, identify the actual command and update both repo Section 4 README and Section 5 of the proposal.
+2. ✅ **Done.** `lk agent create` confirmed working by live deploy (2026-05-11). Auto-generated Dockerfile gotcha (Bookworm → Trixie base) is now documented in `sections/04-ship-it/README.md`.
 
 3. **Decide on the entrypoint pattern** (Finding 2). Either:
    - Update the repo to use `AgentServer` + `@server.rtc_session()` to match current docs, or
@@ -476,4 +476,4 @@ In priority order:
    - ~~Replace "global edge network" with vendor phrasing~~ DONE. Proposal uses "LiveKit Cloud's global infrastructure" and repo README uses "global network and infrastructure" (commit 06dff7e).
    - Consider whether "production-ready" needs softening to "production-grade fundamentals" to set honest expectations.
 
-The course's substantive material (semantic turn detection, function tools, the `on_user_turn_completed` retrieval pattern, the Moss in-process retrieval story, deployed-on-cloud finish) is all well-grounded in vendor docs. The metrics API (Finding 1) has been fixed. Remaining open items: the entrypoint scaffolding (Finding 2) and the deploy command (Finding 3), both repairable by updating the repo before the live session.
+The course's substantive material (semantic turn detection, function tools, the `on_user_turn_completed` retrieval pattern, the Moss in-process retrieval story, deployed-on-cloud finish) is all well-grounded in vendor docs. Findings 1 and 3 are resolved. Only Finding 2 (legacy `WorkerOptions` entrypoint vs current docs' `AgentServer` pattern) remains open, pending an instructor decision on whether to migrate or to teach the worker-based pattern deliberately.

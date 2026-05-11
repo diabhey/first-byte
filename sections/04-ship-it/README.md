@@ -52,7 +52,17 @@ After deploy:
 2. Set environment variables in the agent's settings: `MOSS_PROJECT_ID`, `MOSS_PROJECT_KEY`, `MOSS_INDEX_NAME`. (The LiveKit and OpenAI/Deepgram/Cartesia credentials are handled by LiveKit Inference automatically.)
 3. Note the agent ID. Connect from the Agents Playground or any LiveKit room and your deployed agent will dispatch.
 
-That's it. No Dockerfile, no Kubernetes manifest, no SSL cert wrangling.
+That's it. No Kubernetes manifest, no SSL cert wrangling.
+
+> **Heads-up about the auto-generated Dockerfile.** `lk agent create` will drop a starter Dockerfile in your directory using `ghcr.io/astral-sh/uv:python3.13-bookworm-slim` as the base. Debian Bookworm ships glibc 2.36; `inferedge-moss-core` (the binary behind the `moss` package) only ships wheels for `manylinux_2_38_x86_64` on Linux x86_64. The build will fail at `uv sync --locked`. Fix: swap the base to `python:3.13-slim-trixie` (Debian 13, glibc 2.38) and copy the `uv` binary from astral's image:
+>
+> ```dockerfile
+> ARG PYTHON_VERSION=3.13
+> FROM python:${PYTHON_VERSION}-slim-trixie AS base
+> COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /usr/local/bin/
+> ```
+>
+> Apply the same change in the `--- Production stage ---` `FROM base` block (no edit needed there since it just inherits). Then rerun `lk agent create`.
 
 ## Multi-agent handoff (teaser, no exercise)
 
