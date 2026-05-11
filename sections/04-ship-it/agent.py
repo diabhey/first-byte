@@ -4,9 +4,15 @@ Section 4: Ship it.
 The Section 3 agent, plus production observability and ready for `lk agent
 create`. Two upgrades:
 
-  1. metrics_collected event handler logs per-turn STT, LLM, and TTS latency.
-  2. UsageCollector accumulates token and audio usage; we log the summary on
-     shutdown via add_shutdown_callback.
+  1. conversation_item_added subscription reads per-turn latency from
+     ChatMessage.metrics on every committed turn (STT first byte, LLM
+     time-to-first-token, TTS first audio chunk, end-to-end).
+  2. session_usage_updated accumulates model usage across the call; we log
+     the cumulative tally on shutdown via add_shutdown_callback.
+
+Note: the session-level `metrics_collected` event used in earlier versions of
+livekit-agents is deprecated. We use `conversation_item_added` for per-turn
+latency and `session_usage_updated` for usage rollup instead.
 
 Run locally:
     uv run python sections/04-ship-it/agent.py dev
@@ -24,11 +30,11 @@ from livekit.agents import (
     AgentSession,
     ChatContext,
     ChatMessage,
+    ConversationItemAddedEvent,
     JobContext,
-    MetricsCollectedEvent,
+    SessionUsageUpdatedEvent,
     WorkerOptions,
     cli,
-    metrics,
 )
 from livekit.plugins import silero
 from livekit.plugins.turn_detector.multilingual import MultilingualModel
@@ -112,19 +118,31 @@ async def entrypoint(ctx: JobContext) -> None:
     )
 
     # Production observability. Two pieces:
-    #   1. metrics_collected fires on every measurable event in the pipeline:
-    #      STT first byte, LLM time-to-first-token, TTS first audio chunk.
-    #   2. UsageCollector accumulates token and audio usage across the session.
-    usage_collector = metrics.UsageCollector()
+    #   1. conversation_item_added fires when a turn commits. ChatMessage.metrics
+    #      carries per-turn latency: STT first byte, LLM time-to-first-token,
+    #      TTS first audio chunk, end-to-end.
+    #   2. session_usage_updated tracks cumulative model usage (tokens, audio
+    #      durations). We log the final tally on shutdown via add_shutdown_callback.
 
-    @session.on("metrics_collected")
-    def _on_metrics(ev: MetricsCollectedEvent) -> None:
-        metrics.log_metrics(ev.metrics)
-        usage_collector.collect(ev.metrics)
+    @session.on("conversation_item_added")
+    def _on_item(ev: ConversationItemAddedEvent) -> None:
+        if not isinstance(ev.item, ChatMessage):
+            return
+        m = ev.item.metrics
+        if not m:
+            return
+        e2e = m.get("e2e_latency")
+        if ev.item.role == "assistant" and e2e is not None:
+            print(f"[metrics] turn e2e_latency={e2e:.3f}s metrics={m}")
+
+    @session.on("session_usage_updated")
+    def _on_usage(ev: SessionUsageUpdatedEvent) -> None:
+        for usage in ev.usage.model_usage:
+            print(f"[usage] {usage.provider}/{usage.model}: {usage}")
 
     async def _log_session_summary() -> None:
-        summary = usage_collector.get_summary()
-        print(f"[usage] session summary: {summary}")
+        for usage in session.usage.model_usage:
+            print(f"[usage] session final: {usage.provider}/{usage.model}: {usage}")
 
     ctx.add_shutdown_callback(_log_session_summary)
 
