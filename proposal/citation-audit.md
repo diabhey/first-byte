@@ -410,12 +410,15 @@ All four elements (`@function_tool`, `get_order_status`, `ToolError`, `disallow_
 | `chat_ctx` propagation | ✅ | LiveKit Agents framework feature; repo example shows the syntax. |
 | "30 lines" | 📁 | Repo claim about the example length. |
 
-> "Going-further callouts: wiring a visitor-facing frontend with the LiveKit JavaScript Client SDK (mic permission flow, AudioContext resume on Safari, an audio-reactive state machine across idle, listening, thinking, and speaking, and a token endpoint that hands a per-visitor join token to the browser), multi-agent handoffs in 30 lines, telephony via `lk sip`, vision-enabled realtime models, photoreal avatars (Tavus/Anam), self-hosting LiveKit Server"
+> "Going-further callouts: wiring the visitor-facing half on Cloudflare Pages (Pages Function `/api/token` minting per-visitor tokens with the Web Crypto API), the three security layers a public voice page needs (Origin / Sec-Fetch-Site check, per-visitor unique rooms, Cloudflare WAF rate limiting), the audio-reactive UI state machine driven from AnalyserNode taps, multi-agent handoffs, `lk sip` telephony, vision-enabled realtime models, Tavus/Anam avatars, self-hosting"
 
 | Claim | Status | Source |
 |---|---|---|
 | LiveKit JavaScript Client SDK exists | ✅ | https://docs.livekit.io/reference/client-sdk-js/ — official client SDK reference. Package is `livekit-client`. |
-| Mic permission flow / AudioContext / state machine / token endpoint as the 4 needed pieces | ✗ | Instructor framing surfaced by the hb-agent build. Accurate description of what was actually needed, but not a quoted vendor claim. Acceptable as a teaser callout. |
+| Cloudflare Pages Function at `/api/token` minting LiveKit JWTs with Web Crypto | ✅ | Pattern shipped to production at heartbyte.io (`functions/api/token.js`). The Pages Functions runtime supports `crypto.subtle.sign` natively; no npm deps; secrets injected as Pages env vars. |
+| Three security layers (Origin/Sec-Fetch-Site, per-visitor unique rooms, CF WAF rate limiting) | ✅ | All three deployed to production at heartbyte.io. Layer 1 in `functions/api/token.js` (rejects requests without `Sec-Fetch-Site: same-origin` and missing-Origin server-to-server calls). Layer 2 mints `heartbyte-orb-<uuid>` per visitor — LiveKit Cloud Agents auto-dispatch one worker per new room. Layer 3 is a CF WAF rate-limiting rule on `/api/token` (10 req/min/IP → 429). |
+| Audio-reactive state machine (idle/connecting/listening/thinking/speaking) | ✅ | Driven from `AnalyserNode.getByteFrequencyData()` taps on the local mic and the remote agent track. LiveKit's `ActiveSpeakersChanged` event signals listening vs speaking; a `setTimeout`-based fallback adds `thinking` between turns. Pattern shipped at heartbyte.io. |
+| `lk agent deploy` (for updating an existing deployed agent) | ✅ | Confirmed working alongside `lk agent create`. Reads the agent ID from `livekit.toml` written by the original `create`, rebuilds the container, rolls the worker. No dashboard secret churn needed. |
 | `lk sip` for telephony | 📁 | Repo. LK-CLI overview mentions SIP commands generically. |
 | Vision-enabled realtime models | ✅ | Multiple LiveKit Inference providers support video input (LK-INFERENCE). |
 | Tavus, Anam avatar plugins | 📁 | Repo claim. Both are LiveKit Marketplace integrations; not deeply documented in core LiveKit docs. |
