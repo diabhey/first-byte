@@ -2,46 +2,514 @@
   {
     "id": "what-is-heartbyte",
     "text": "HeartByte is the working studio of Abhimanyu Selvan, who goes by Abhi or diabhey. It is where he ships production AI agent systems for AI-native startups. The name comes from the idea that machines need a heart as much as they need a brain: systems that hold up to real users, not demos. HeartByte is based in The Netherlands.",
-    "metadata": {"topic": "company"}
+    "metadata": {
+      "topic": "company"
+    }
   },
   {
     "id": "who-is-abhi",
     "text": "Abhimanyu Selvan, also known as Abhi or diabhey, is the founder of HeartByte. He describes himself as an AI systems builder who ships production agent systems for AI-native startups. His personal site is diabhey.com.",
-    "metadata": {"topic": "people"}
+    "metadata": {
+      "topic": "people"
+    }
   },
   {
     "id": "abhi-services",
     "text": "Abhi takes on engagements with AI-native startups to architect, build, and ship production agent systems end to end. He prefers demonstrated proof over promises. Concrete past outcomes include build-time reductions from 27 to 11 minutes, developer onboarding compressed from 15 to 3 minutes, and 750 thousand dollars in ARR generated through partnership work.",
-    "metadata": {"topic": "services"}
+    "metadata": {
+      "topic": "services"
+    }
   },
   {
     "id": "abhi-method",
     "text": "Abhi operates in three phases. First, architect: read the system end to end and document scope and risk before writing a line of code. Second, build: production code and infrastructure, not prototypes or slides. Third, ship: ongoing operational ownership alongside the team rather than handing off and walking away.",
-    "metadata": {"topic": "methodology"}
+    "metadata": {
+      "topic": "methodology"
+    }
   },
   {
     "id": "abhi-background",
     "text": "Before AI agents, Abhi spent over a decade in safety-critical systems engineering. He worked on Boeing 787 flight simulator cockpit systems at Lockheed Martin, automated guided vehicles at Oceaneering, medical IoT platforms at Onera Health, and the Otomi Kubernetes deployment platform at Red Kubes. Most recently he led developer advocacy at DigitalOcean before going independent.",
-    "metadata": {"topic": "background"}
+    "metadata": {
+      "topic": "background"
+    }
   },
   {
     "id": "how-to-get-in-touch",
     "text": "The best way to reach Abhi is by email at abhimanyuselvan at pm dot me. You can also find him on LinkedIn at linkedin.com/in/abhimanyuselvan, on GitHub at github.com/diabhey, or on Twitter as diabhey. He is based in The Netherlands and operates in Central European Time.",
-    "metadata": {"topic": "contact"}
+    "metadata": {
+      "topic": "contact"
+    }
   },
   {
     "id": "what-this-orb-is",
     "text": "This orb is the HeartByte homepage. It is a voice agent that visitors can talk to instead of reading a static page. Built on LiveKit Agents and grounded with Moss for in-process semantic search. The orb is itself a demonstration of what Abhi ships for clients: production voice AI agents that work for real users.",
-    "metadata": {"topic": "meta"}
+    "metadata": {
+      "topic": "meta"
+    }
   },
   {
     "id": "voice-agent-stack",
     "text": "The orb runs on LiveKit Agents for the voice pipeline and Moss for retrieval. STT, LLM, and TTS are unified through LiveKit Inference. Turn detection uses LiveKit's semantic end-of-turn model. Retrieval runs on every user turn via the on_user_turn_completed hook so answers stay grounded in HeartByte facts. The target is first audio out in under 800 milliseconds.",
-    "metadata": {"topic": "meta"}
+    "metadata": {
+      "topic": "meta"
+    }
   },
   {
     "id": "what-can-i-ask",
     "text": "You can ask the orb anything about HeartByte, about Abhi's background, services, or methodology, or how to get in touch. If you want a written follow-up, the orb will point you at Abhi's email.",
-    "metadata": {"topic": "meta"}
+    "metadata": {
+      "topic": "meta"
+    }
+  },
+  {
+    "id": "phi-be-like-water",
+    "text": "Bruce Lee said, empty your mind, be formless, shapeless, like water. You put water into a cup, it becomes the cup. You put it into a bottle, it becomes the bottle. You put it into a teapot, it becomes the teapot. Water can flow, or it can crash. Be water, my friend. Abhi reads this as a principle for builders. Do not marry your plan. Pour yourself into the shape the problem actually has, not the shape you wish it had.",
+    "metadata": {
+      "category": "adaptability",
+      "source": "bruce-lee",
+      "theme": "formless-flow",
+      "tone": "calm-direct"
+    }
+  },
+  {
+    "id": "phi-no-human-is-limited",
+    "text": "Eliud Kipchoge ran a marathon in under two hours and said, no human is limited. Any human being can go beyond their limits. No human being should be limited in their thoughts, in what he or she should be doing. Abhi treats this as the founding axiom of HeartByte. The ceiling you assume is almost never the ceiling that exists. Test the ceiling.",
+    "metadata": {
+      "category": "discipline",
+      "source": "eliud-kipchoge",
+      "theme": "limits-are-mental",
+      "tone": "stirring"
+    }
+  },
+  {
+    "id": "phi-disciplined-are-free",
+    "text": "Kipchoge says, only the disciplined ones in life are free. If you are undisciplined, you are a slave to your moods and your passions. Freedom is not the absence of structure. Freedom is the byproduct of structure you chose for yourself.",
+    "metadata": {
+      "category": "discipline",
+      "source": "eliud-kipchoge",
+      "theme": "freedom-through-discipline",
+      "tone": "stirring"
+    }
+  },
+  {
+    "id": "phi-slow-is-smooth",
+    "text": "The Navy SEAL mantra is, slow is smooth, smooth is fast. Rushing produces errors, and errors cost more time than they save. Move deliberately. Get the motion clean. Speed is what you earn when the motion stops costing you anything. Abhi runs every architecture phase this way. Read the system end to end before writing a line of code.",
+    "metadata": {
+      "category": "patience",
+      "source": "navy-seals",
+      "theme": "deliberate-practice",
+      "tone": "grounded"
+    }
+  },
+  {
+    "id": "phi-run-slow-to-run-fast",
+    "text": "Distance runners have a saying. Run slow to run fast. Eighty percent of your training should be easy. The hard days are only hard because the easy days were honest. In building, the easy work is the reading, the documenting, the listening. Do enough of it and the hard work moves on rails.",
+    "metadata": {
+      "category": "patience",
+      "source": "endurance-running",
+      "theme": "easy-builds-hard",
+      "tone": "grounded"
+    }
+  },
+  {
+    "id": "phi-obstacle-is-the-way",
+    "text": "Marcus Aurelius wrote, the impediment to action advances action. What stands in the way becomes the way. Ryan Holiday built a whole book around it. The obstacle is the way. The thing blocking your project is not a detour. It is the project. The thing you keep avoiding contains the answer.",
+    "metadata": {
+      "category": "stoicism",
+      "source": "marcus-aurelius",
+      "theme": "obstacle-as-path",
+      "tone": "grave-warm"
+    }
+  },
+  {
+    "id": "phi-amor-fati",
+    "text": "Amor fati. Love your fate. The Stoics, and later Nietzsche, named the practice of greeting whatever happens, not as something to merely tolerate, but as the exact material your life is made of. The bad sprint, the failed launch, the rejection. You do not have to like it. You have to use it. Nothing else is on offer.",
+    "metadata": {
+      "category": "stoicism",
+      "source": "stoic-tradition",
+      "theme": "love-your-fate",
+      "tone": "grave-warm"
+    }
+  },
+  {
+    "id": "phi-memento-mori",
+    "text": "Memento mori. Remember you will die. The Stoics kept this close because it is the only deadline that actually clarifies a calendar. If a thing matters in the light of mortality, do it. If it does not, drop it. Abhi reads this as a filter for what work to take and what to refuse.",
+    "metadata": {
+      "category": "stoicism",
+      "source": "stoic-tradition",
+      "theme": "mortality-as-clarity",
+      "tone": "grave-warm"
+    }
+  },
+  {
+    "id": "phi-premeditatio-malorum",
+    "text": "Premeditatio malorum. The premeditation of evils. The Stoic practice of sitting, before the thing happens, with the worst version of it. The launch fails. The client leaves. The model regresses. Look at it. Decide now what you would do. When the real thing arrives, you are not surprised. You are already moving.",
+    "metadata": {
+      "category": "stoicism",
+      "source": "stoic-tradition",
+      "theme": "pre-mortem",
+      "tone": "grave-warm"
+    }
+  },
+  {
+    "id": "phi-dichotomy-of-control",
+    "text": "Epictetus drew a line through the world. Some things are up to us, and some things are not. Our judgments, intentions, desires, aversions, those are ours. Everything else, the weather, the market, what other people think, is not. Worry costs the same whether you can act or not. Spend the worry only where action is possible.",
+    "metadata": {
+      "category": "stoicism",
+      "source": "epictetus",
+      "theme": "dichotomy-of-control",
+      "tone": "grounded"
+    }
+  },
+  {
+    "id": "phi-what-you-resist-persists",
+    "text": "Carl Jung observed that what you resist not only persists, it grows. The part of yourself you push away gathers in the shadow, and it runs your life from there. Abhi applies this to code and to people. The bug you keep dodging is the bug shaping your architecture. The conversation you keep avoiding is the one already shaping the team.",
+    "metadata": {
+      "category": "shadow-work",
+      "source": "carl-jung",
+      "theme": "resistance-as-signal",
+      "tone": "calm-direct"
+    }
+  },
+  {
+    "id": "phi-individuation",
+    "text": "Jung called the lifelong project individuation. The work of integrating the disowned parts of yourself into a whole person. The shadow is not the enemy. It is the reservoir of every trait you had to bury to be acceptable. The work, late in life and early, is to gather those parts back and stop pretending they are not yours.",
+    "metadata": {
+      "category": "shadow-work",
+      "source": "carl-jung",
+      "theme": "wholeness-over-perfection",
+      "tone": "calm-direct"
+    }
+  },
+  {
+    "id": "phi-long-term-games",
+    "text": "Naval Ravikant says, play long term games with long term people. All returns in life, in wealth, in relationships, in knowledge, come from compound interest. Compounding only happens when you stay in the game with the same people long enough for trust to multiply. Most of the upside in a career is hidden on the far side of staying.",
+    "metadata": {
+      "category": "long-term-thinking",
+      "source": "naval-ravikant",
+      "theme": "compounding",
+      "tone": "matter-of-fact"
+    }
+  },
+  {
+    "id": "phi-specific-knowledge",
+    "text": "Naval talks about specific knowledge. Knowledge you cannot get by sitting in a classroom. It is found by pursuing your genuine curiosity and passion, rather than whatever is hot right now. Specific knowledge feels like play to you and looks like work to others. That gap is the moat.",
+    "metadata": {
+      "category": "long-term-thinking",
+      "source": "naval-ravikant",
+      "theme": "specific-knowledge",
+      "tone": "matter-of-fact"
+    }
+  },
+  {
+    "id": "phi-make-something-people-want",
+    "text": "Paul Graham reduced the whole startup question to one sentence. Make something people want. Everything else, fundraising, hiring, branding, valuation, is downstream of that single load-bearing fact. If the thing is not wanted, no amount of polish saves it. If it is wanted, almost nothing stops it.",
+    "metadata": {
+      "category": "craft",
+      "source": "paul-graham",
+      "theme": "demand-first",
+      "tone": "matter-of-fact"
+    }
+  },
+  {
+    "id": "phi-do-things-that-dont-scale",
+    "text": "Paul Graham, again. Do things that do not scale. In the early days, hand-onboard every user. Write the welcome email yourself. Sit in the support channel. Most founders skip this because it feels beneath them. The ones who do not skip it learn what their product actually is, which no dashboard can teach you.",
+    "metadata": {
+      "category": "craft",
+      "source": "paul-graham",
+      "theme": "manual-before-automated",
+      "tone": "matter-of-fact"
+    }
+  },
+  {
+    "id": "phi-beginners-mind",
+    "text": "Shunryu Suzuki taught the Zen idea of beginner's mind. In the beginner's mind there are many possibilities. In the expert's mind there are few. Expertise narrows. To stay alive in a fast-moving field, you have to keep returning, on purpose, to the position of not knowing. That is where the next move usually hides.",
+    "metadata": {
+      "category": "eastern-wisdom",
+      "source": "shunryu-suzuki",
+      "theme": "beginners-mind",
+      "tone": "calm-direct"
+    }
+  },
+  {
+    "id": "phi-wu-wei",
+    "text": "The Tao Te Ching teaches wu wei. Effortless action. Not laziness, not inaction, but action that does not strain against the grain of the situation. The river does not push. It finds the lowest path and arrives. Most overwork is the cost of fighting a current that you could have used.",
+    "metadata": {
+      "category": "eastern-wisdom",
+      "source": "tao-te-ching",
+      "theme": "effortless-action",
+      "tone": "calm-direct"
+    }
+  },
+  {
+    "id": "phi-water-overcomes-stone",
+    "text": "Lao Tzu wrote that nothing in the world is softer than water, yet nothing is better at overcoming the hard and strong. Persistence dressed as gentleness wins on a long enough timeline. The hardest stones in any career are worn down not by force but by showing up, in the same place, every day, for years.",
+    "metadata": {
+      "category": "eastern-wisdom",
+      "source": "lao-tzu",
+      "theme": "soft-overcomes-hard",
+      "tone": "calm-direct"
+    }
+  },
+  {
+    "id": "phi-second-best-time",
+    "text": "There is an old proverb. The best time to plant a tree was twenty years ago. The second best time is today. Kipchoge says the same thing about discipline. The second best time is today. Plant the tree of self-discipline. You cannot recover the years you did not start. You can still start.",
+    "metadata": {
+      "category": "discipline",
+      "source": "proverb",
+      "theme": "start-now",
+      "tone": "stirring"
+    }
+  },
+  {
+    "id": "phi-strong-opinions-loosely-held",
+    "text": "Paul Saffo's rule. Strong opinions, loosely held. Have a view. Commit to it hard enough that you can actually test it. And then, when the evidence comes back against you, drop it. Cheaply. Without ego. The mistake is not the opinion. The mistake is gripping the opinion past the data.",
+    "metadata": {
+      "category": "craft",
+      "source": "paul-saffo",
+      "theme": "calibrated-conviction",
+      "tone": "matter-of-fact"
+    }
+  },
+  {
+    "id": "phi-show-your-work",
+    "text": "Abhi prefers demonstrated proof over promises. Anyone can describe what they would build. Far fewer can show what they have already shipped. In an AI-native world flooded with credible-sounding talk, the artifact in production is the only honest argument.",
+    "metadata": {
+      "category": "heartbyte-principles",
+      "source": "abhimanyu-selvan",
+      "theme": "proof-over-promises",
+      "tone": "matter-of-fact"
+    }
+  },
+  {
+    "id": "phi-architect-build-ship",
+    "text": "Abhi works in three phases, in order. Architect. Build. Ship. First, read the system end to end and document scope and risk before writing a line of code. Second, write production code and infrastructure, not prototypes or slides. Third, stay. Operate the thing alongside the team rather than handing off and walking away. The phases do not skip.",
+    "metadata": {
+      "category": "heartbyte-principles",
+      "source": "abhimanyu-selvan",
+      "theme": "method",
+      "tone": "matter-of-fact"
+    }
+  },
+  {
+    "id": "phi-ownership-not-handoff",
+    "text": "A HeartByte engagement does not end at delivery. The most expensive bugs live in the gap between, here is the code, and, here is a system actually running in front of users. Ownership means closing that gap on purpose, by staying in the loop until the thing is breathing on its own.",
+    "metadata": {
+      "category": "heartbyte-principles",
+      "source": "abhimanyu-selvan",
+      "theme": "operational-ownership",
+      "tone": "matter-of-fact"
+    }
+  },
+  {
+    "id": "phi-safety-critical-mindset",
+    "text": "Before AI agents, Abhi spent over a decade in safety-critical systems. Flight simulators at Lockheed Martin. Autonomous vehicles at Oceaneering. Medical IoT at Onera. When the cost of a bad output is a life, you learn to design for the worst path, not the happy path. AI systems deserve the same posture. Assume the model will be wrong, and make wrong survivable.",
+    "metadata": {
+      "category": "heartbyte-principles",
+      "source": "abhimanyu-selvan",
+      "theme": "design-for-failure",
+      "tone": "grounded"
+    }
+  },
+  {
+    "id": "phi-intersection-human-machine",
+    "text": "HeartByte sits at the intersection of human and machine intelligence. The point is not to replace the human with the machine, nor to dress the machine up as a human. The point is the seam between them. Most of the interesting work this decade lives in that seam, and most of the failure modes do too.",
+    "metadata": {
+      "category": "heartbyte-principles",
+      "source": "abhimanyu-selvan",
+      "theme": "human-machine-seam",
+      "tone": "calm-direct"
+    }
+  },
+  {
+    "id": "phi-mamba-mentality",
+    "text": "Kobe Bryant called it Mamba mentality. It is not about the result. It is about the willingness to do the boring repetition that the result quietly depends on. Most people want to be at the level the work produces, without doing the work that produces it. The mentality is the willingness to do the work anyway.",
+    "metadata": {
+      "category": "discipline",
+      "source": "kobe-bryant",
+      "theme": "process-over-outcome",
+      "tone": "stirring"
+    }
+  },
+  {
+    "id": "phi-1-percent-better",
+    "text": "James Clear, channeling the British cycling team's marginal gains era, made the case for one percent better. Habits compound. A one percent daily improvement, over a year, is roughly thirty-seven times better. A one percent daily decline, over a year, is near zero. The interest rate on your habits is brutal in both directions.",
+    "metadata": {
+      "category": "discipline",
+      "source": "james-clear",
+      "theme": "marginal-gains",
+      "tone": "matter-of-fact"
+    }
+  },
+  {
+    "id": "phi-feynman-first-principles",
+    "text": "Richard Feynman insisted on first principles. Do not reason from analogy. Reason from the physics of the thing. What is actually true here, independent of what people usually say about it. AI building today is full of cargo-culted patterns. The teams that win are the ones who keep asking, but why does that even work.",
+    "metadata": {
+      "category": "craft",
+      "source": "richard-feynman",
+      "theme": "first-principles",
+      "tone": "matter-of-fact"
+    }
+  },
+  {
+    "id": "phi-feynman-fool-yourself",
+    "text": "Feynman also said, the first principle is that you must not fool yourself, and you are the easiest person to fool. Every founder, every engineer, every artist, fools themselves about the thing they made. Build a habit of looking at your work the way an indifferent stranger would. The honesty is uncomfortable. It is also the only honest feedback loop you control.",
+    "metadata": {
+      "category": "craft",
+      "source": "richard-feynman",
+      "theme": "self-deception",
+      "tone": "matter-of-fact"
+    }
+  },
+  {
+    "id": "phi-rumi-wound-is-where-light-enters",
+    "text": "Rumi wrote, the wound is the place where the light enters you. The thing that broke you open is not a detour from your real life. It is the doorway. People who try to seal the wound shut tend to seal the light out at the same time. Better to let the crack stay, and let it teach.",
+    "metadata": {
+      "category": "shadow-work",
+      "source": "rumi",
+      "theme": "wound-as-doorway",
+      "tone": "warm"
+    }
+  },
+  {
+    "id": "phi-rumi-what-you-seek",
+    "text": "Rumi again. What you seek is seeking you. Most of the deepest pulls in a person's life, the work, the partner, the city, the calling, are not random. They tug at you because the shape on the other end is already pulling. The job is to stop overruling the pull with the plan.",
+    "metadata": {
+      "category": "presence",
+      "source": "rumi",
+      "theme": "trust-the-pull",
+      "tone": "warm"
+    }
+  },
+  {
+    "id": "phi-viktor-frankl-meaning",
+    "text": "Viktor Frankl survived Auschwitz and afterward wrote that, between stimulus and response, there is a space. In that space is our power to choose our response. In our response lies our growth and our freedom. The smallest practice in life is to widen that gap. Even by a breath. That is where every other discipline starts.",
+    "metadata": {
+      "category": "stoicism",
+      "source": "viktor-frankl",
+      "theme": "the-gap-between-stimulus-and-response",
+      "tone": "grave-warm"
+    }
+  },
+  {
+    "id": "phi-frankl-the-why",
+    "text": "Frankl, quoting Nietzsche, said, he who has a why to live can bear almost any how. The reason has to be load-bearing. Not a marketing line, not a goal. A reason large enough to carry the worst day of the project. Most burnouts are not overwork. They are the slow discovery that the why was too small.",
+    "metadata": {
+      "category": "presence",
+      "source": "viktor-frankl",
+      "theme": "find-your-why",
+      "tone": "grave-warm"
+    }
+  },
+  {
+    "id": "phi-buddha-two-arrows",
+    "text": "The Buddha taught the parable of the two arrows. When something painful happens to you, that is the first arrow. The second arrow is the story you tell yourself about it. The blame, the catastrophizing, the rehearsal of the unfairness. The first arrow you cannot always avoid. The second arrow you fire at yourself.",
+    "metadata": {
+      "category": "presence",
+      "source": "buddha",
+      "theme": "two-arrows",
+      "tone": "calm-direct"
+    }
+  },
+  {
+    "id": "phi-zen-chop-wood-carry-water",
+    "text": "There is a Zen line. Before enlightenment, chop wood, carry water. After enlightenment, chop wood, carry water. The big breakthrough does not exempt you from the ordinary work. It changes who is doing it. The morning routine still has to happen. The inbox still has to be read. The work is the path.",
+    "metadata": {
+      "category": "eastern-wisdom",
+      "source": "zen-tradition",
+      "theme": "ordinary-as-path",
+      "tone": "calm-direct"
+    }
+  },
+  {
+    "id": "phi-gandhi-be-the-change",
+    "text": "Gandhi is often quoted, be the change you wish to see in the world. The exact attribution is shakier than the saying. The principle survives anyway. You cannot install a culture in others that you have not first installed in yourself. Every preached value collapses the moment your behavior contradicts it.",
+    "metadata": {
+      "category": "presence",
+      "source": "gandhi",
+      "theme": "embody-the-value",
+      "tone": "warm"
+    }
+  },
+  {
+    "id": "phi-thoreau-march-different-drummer",
+    "text": "Thoreau wrote, if a man does not keep pace with his companions, perhaps it is because he hears a different drummer. Let him step to the music which he hears, however measured or far away. The world rewards conformity early and originality late. The hard part is keeping faith during the gap between the two.",
+    "metadata": {
+      "category": "long-term-thinking",
+      "source": "henry-david-thoreau",
+      "theme": "march-to-your-drum",
+      "tone": "warm"
+    }
+  },
+  {
+    "id": "phi-emerson-trust-thyself",
+    "text": "Emerson, in Self-Reliance, wrote, trust thyself. Every heart vibrates to that iron string. Inside every person there is a signal that is unmistakably theirs, and most lives are spent overruling it for the safer, borrowed signal. The art is the slow practice of listening to your own iron string again, especially when the room disagrees.",
+    "metadata": {
+      "category": "presence",
+      "source": "ralph-waldo-emerson",
+      "theme": "self-trust",
+      "tone": "warm"
+    }
+  },
+  {
+    "id": "phi-pirsig-quality",
+    "text": "Robert Pirsig, in Zen and the Art of Motorcycle Maintenance, circles a word he calls Quality. You know it when you see it. The well-tuned engine. The clean function. The sentence that lands. Quality is not in the object alone, and not in the observer alone. It is in the care brought to the meeting between them. Care is the whole game.",
+    "metadata": {
+      "category": "craft",
+      "source": "robert-pirsig",
+      "theme": "quality-as-care",
+      "tone": "warm"
+    }
+  },
+  {
+    "id": "phi-mcluhan-medium-is-message",
+    "text": "Marshall McLuhan said, the medium is the message. The shape of how a thing is delivered changes what the thing is. A philosophy read silently on a page is a different philosophy from one spoken aloud by a voice agent on a homepage. The orb you are speaking to right now is not just a delivery mechanism for ideas. It is the idea.",
+    "metadata": {
+      "category": "craft",
+      "source": "marshall-mcluhan",
+      "theme": "medium-as-message",
+      "tone": "matter-of-fact"
+    }
+  },
+  {
+    "id": "phi-camus-sisyphus",
+    "text": "Albert Camus took the Greek myth of Sisyphus, the man condemned to roll a boulder up a hill forever, and reframed it. One must imagine Sisyphus happy. The work does not become meaningful because it ends. It becomes meaningful because we choose to bring ourselves fully to it. Engineering is sometimes that boulder. The choice is how you push.",
+    "metadata": {
+      "category": "presence",
+      "source": "albert-camus",
+      "theme": "meaning-in-the-rolling",
+      "tone": "warm"
+    }
+  },
+  {
+    "id": "phi-rilke-live-the-questions",
+    "text": "Rilke, in Letters to a Young Poet, wrote, be patient toward all that is unsolved in your heart, and try to love the questions themselves. Do not now seek the answers, which cannot be given because you would not be able to live them. The point is to live everything. Live the questions now. Perhaps then, someday far in the future, you will gradually, without noticing it, live your way into the answer.",
+    "metadata": {
+      "category": "presence",
+      "source": "rainer-maria-rilke",
+      "theme": "live-the-questions",
+      "tone": "warm"
+    }
+  },
+  {
+    "id": "phi-mr-rogers-look-for-the-helpers",
+    "text": "Fred Rogers said his mother told him, when there are scary things in the news, look for the helpers. You will always find people who are helping. The principle scales. In any failing system, in any chaotic team, in any rough season, the signal you can act on is, who is quietly trying to fix this. Find them. Be one.",
+    "metadata": {
+      "category": "service",
+      "source": "fred-rogers",
+      "theme": "look-for-the-helpers",
+      "tone": "warm"
+    }
+  },
+  {
+    "id": "phi-end-with-action",
+    "text": "Most philosophy ends in nodding. The orb tries to end somewhere else. Every principle here is only as valuable as the next thing you do. So when you leave this conversation, name one small action, today, that would put a single one of these ideas into motion. The smaller and sooner, the better. That is the whole point.",
+    "metadata": {
+      "category": "heartbyte-principles",
+      "source": "abhimanyu-selvan",
+      "theme": "act-on-it",
+      "tone": "stirring"
+    }
   }
 ]

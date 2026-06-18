@@ -14,30 +14,24 @@ uv run python sections/04-ship-it/agent_start.py dev
 
 The finished reference is in [`agent.py`](./agent.py). Connect via the [Agents Playground](https://agents-playground.livekit.io) and have a conversation. Watch your terminal:
 
-- **`[metrics] turn e2e_latency=...`** logs fire once per assistant turn, sourced from `ChatMessage.metrics` on the `conversation_item_added` event. STT first byte, LLM time-to-first-token, TTS first audio chunk, and end-to-end are all here. This is your latency budget audit in real time.
-- **`[usage] ...`** logs fire whenever `session_usage_updated` ticks, and once more on shutdown via `add_shutdown_callback` for the final cumulative tally. Tokens in/out per provider and audio durations.
+- **per-turn metrics** print on the `metrics_collected` event via `metrics.log_metrics(ev.metrics)`: STT, LLM time-to-first-token, TTS first audio byte, and end-of-utterance delay. This is your latency budget audit in real time.
+- **`[usage] session summary: ...`** logs once on shutdown via `add_shutdown_callback`, from a `metrics.UsageCollector` that accumulated each event. Tokens in/out per model and audio durations.
 
 ```python
-@session.on("conversation_item_added")
-def _on_item(ev: ConversationItemAddedEvent) -> None:
-    if not isinstance(ev.item, ChatMessage):
-        return
-    m = ev.item.metrics
-    if not m:
-        return
-    e2e = m.get("e2e_latency")
-    if ev.item.role == "assistant" and e2e is not None:
-        print(f"[metrics] turn e2e_latency={e2e:.3f}s metrics={m}")
+usage_collector = metrics.UsageCollector()
 
-@session.on("session_usage_updated")
-def _on_usage(ev: SessionUsageUpdatedEvent) -> None:
-    for usage in ev.usage.model_usage:
-        print(f"[usage] {usage.provider}/{usage.model}: {usage}")
+@session.on("metrics_collected")
+def _on_metrics(ev: MetricsCollectedEvent) -> None:
+    metrics.log_metrics(ev.metrics)
+    usage_collector.collect(ev.metrics)
+
+async def _log_session_summary() -> None:
+    print(f"[usage] session summary: {usage_collector.get_summary()}")
 
 ctx.add_shutdown_callback(_log_session_summary)
 ```
 
-> Earlier versions of `livekit-agents` exposed a session-level `metrics_collected` event for this. That event is deprecated. The current pattern is `conversation_item_added` for per-turn latency and `session_usage_updated` for usage rollup.
+> Note: `metrics_collected` + `metrics.UsageCollector` is the current livekit-agents pattern (verified on v1.3.11). Some docs reference a `session_usage_updated` event / `ChatMessage.metrics`; those are not present in the installed SDK.
 
 ## Step 2: Deploy
 
@@ -119,8 +113,8 @@ When you ship this for real visitors, you replace the hard-coded token in `confi
 
 ## Concepts introduced
 
-- `conversation_item_added` event + `ChatMessage.metrics` for per-turn latency observability
-- `session_usage_updated` event + `session.usage` for cumulative model-usage rollup
+- `metrics_collected` event + `metrics.log_metrics` for per-turn latency observability
+- `metrics.UsageCollector` for cumulative model-usage rollup
 - `ctx.add_shutdown_callback` for end-of-session reporting
 - `lk agent create` for one-command deploy to LiveKit Cloud Agents
 - The pattern: observability before deploy, not after
