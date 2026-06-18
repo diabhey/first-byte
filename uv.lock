@@ -441,9 +441,9 @@ wheels = [
 ]
 
 [[package]]
-name = "first-byte-ship-it"
+name = "first-byte"
 version = "0.1.0"
-source = { virtual = "." }
+source = { editable = "." }
 dependencies = [
     { name = "livekit-agents" },
     { name = "livekit-plugins-silero" },
