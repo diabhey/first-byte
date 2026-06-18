@@ -36,15 +36,14 @@ These are the issues that matter most before this proposal goes to O'Reilly. The
 
 **Original issue:** `sections/04-ship-it/agent.py` subscribed to the deprecated session-level `metrics_collected` event.
 
-**Resolution applied:**
-- `04-ship-it/agent.py` now subscribes to `conversation_item_added` and reads per-turn latency from `ChatMessage.metrics`, and to `session_usage_updated` for cumulative usage. `add_shutdown_callback` reads `session.usage` for the final tally.
-- Imports updated: removed `MetricsCollectedEvent` and the `metrics` module; added `ConversationItemAddedEvent` and `SessionUsageUpdatedEvent`.
-- `04-ship-it/README.md` code snippet and "Concepts introduced" list rewritten to match.
-- Proposal Section 5 Exercise 7 bullet rewritten to describe the new pattern.
+**Resolution applied (corrected 2026-06-18 after running against a live session):**
+- `04-ship-it/agent.py` subscribes to `metrics_collected`, logs per-turn metrics with `metrics.log_metrics(ev.metrics)`, and accumulates usage with a `metrics.UsageCollector`. `add_shutdown_callback` logs `usage_collector.get_summary()` for the final tally.
+- Imports: `MetricsCollectedEvent` and the `metrics` module — the pattern the SDK actually ships.
+- `04-ship-it/README.md`, the proposal Section 5 Exercise 7 bullet, and the `agent_start.py` stub all describe this pattern.
 
-LK-EVENTS quote backing the new pattern: *"The session-level `metrics_collected` event is deprecated. Use `session_usage_updated` for usage tracking and `ChatMessage.metrics` for per-turn latency."*
+**Important correction:** an LK-EVENTS doc page recommended `session_usage_updated` (for usage) and `ChatMessage.metrics` (for per-turn latency), and an earlier pass adopted that. **Those symbols do not exist in the shipped `livekit-agents` 1.3.x** — `SessionUsageUpdatedEvent`, `ChatMessage.metrics`, and `session.usage` all fail on import/access (verified at runtime; the agent crashed on `ImportError: cannot import name 'SessionUsageUpdatedEvent'`). The doc diverged from the pinned SDK. The working API is `metrics_collected` + `metrics.UsageCollector`, and the course + worker are pinned to `livekit-agents>=1.3.0,<1.4.0` (1.3.12). **The Section 5 verification rows below that cite `conversation_item_added` / `session_usage_updated` / `ChatMessage.metrics` are superseded by this finding.**
 
-**Remaining caveat:** the new code hasn't been executed against a live LiveKit session. Run `uv run python sections/04-ship-it/agent.py dev` and confirm the new `[metrics] turn e2e_latency=...` and `[usage] ...` lines fire as expected.
+**Validated:** ran `agent.py dev` against a live LiveKit session — `[moss] index 'heartbyte-io' loaded`, STT/TTS, and `[usage] session summary: UsageSummary(...)` all fired on 1.3.12.
 
 ### Finding 2: The repo's entrypoint pattern is older than the current LiveKit docs example
 
@@ -156,8 +155,8 @@ This is not a course-claim defect, it's a tooling-default issue that students wi
 
 | Claim | Status | Source |
 |---|---|---|
-| Per-turn metrics exist | ✅ | LK-EVENTS: *"`ChatMessage.metrics`... for per-turn latency."* |
-| Per-turn metrics via `ChatMessage.metrics` (new) | ✅ | LK-EVENTS. Repo updated — see Finding 1 (resolved). |
+| Per-turn metrics exist | ✅ | Shipped via the `metrics_collected` event (`MetricsCollectedEvent.metrics`); see Finding 1. |
+| Per-turn metrics via `metrics_collected` + `metrics.log_metrics` | ✅ | Repo uses this; `ChatMessage.metrics` is not in the shipped SDK — see Finding 1. |
 
 > "a single-command deploy"
 
@@ -210,7 +209,7 @@ All four sub-claims ✅ via LK-NODES + MOSS-VOICE + MOSS-LLMS (covered above).
 
 | Claim | Status | Source |
 |---|---|---|
-| Per-turn metrics | ✅ | LK-EVENTS. Repo updated to current pattern (`conversation_item_added` + `ChatMessage.metrics`). See Finding 1 (resolved). |
+| Per-turn metrics | ✅ | Repo uses the `metrics_collected` + `metrics.UsageCollector` pattern (the shipped-SDK API). See Finding 1. |
 | `lk agent create` | ✅ | Confirmed working by live deploy (hb-agent commit `1eee9e4` carries the `livekit.toml` with the assigned agent ID). See Finding 3 (resolved). |
 
 ---
@@ -364,8 +363,8 @@ Editorial.
 
 | Claim | Status | Source |
 |---|---|---|
-| Per-turn STT/LLM/TTS metrics exist | ✅ | LK-EVENTS via `ChatMessage.metrics`. |
-| Repo uses `conversation_item_added` + `session_usage_updated` | ✅ | Finding 1 resolved. LK-EVENTS confirms both events. |
+| Per-turn STT/LLM/TTS metrics exist | ✅ | Via the `metrics_collected` event (`MetricsCollectedEvent.metrics`); see Finding 1. |
+| Repo uses `metrics_collected` + `metrics.UsageCollector` | ✅ | The shipped-SDK API; `session_usage_updated` does not exist — see Finding 1. |
 | Cost tracking | 📁 | Repo's implementation, not a vendor doc claim per se. (Cost is derivable from token/audio metrics.) |
 | "Observability before deploy, not after" principle | 📁 | Repo phrasing. Instructor framing. |
 
@@ -374,8 +373,8 @@ Editorial.
 | Claim | Status | Source |
 |---|---|---|
 | Starting-point stub `agent_start.py` | 📁 | Repo file (`sections/04-ship-it/agent_start.py`). Section 4's grounded HeartByteAgent is fully in place; only the three event handlers + `add_shutdown_callback` are TODOs. Keeps the 7-min budget honest. |
-| Event subscriptions: `conversation_item_added`, `session_usage_updated` | ✅ | LK-EVENTS. |
-| Per-turn metric access via `ChatMessage.metrics` dict | ✅ | LK-EVENTS quotes `m.get("e2e_latency")` pattern verbatim. |
+| Event subscription: `metrics_collected` | ✅ | The shipped-SDK event; `session_usage_updated` does not exist — see Finding 1. |
+| Per-turn metric access via `metrics.log_metrics(ev.metrics)` | ✅ | The shipped-SDK pattern; `ChatMessage.metrics` does not exist — see Finding 1. |
 | `add_shutdown_callback` on JobContext | ❓ | I did not find a vendor doc page explicitly documenting this method. It is widely used in LiveKit Agents examples, so it almost certainly exists, but I could not pull an authoritative quote in this audit. |
 
 > "Live walkthrough: Deploy with `lk agent create`..."
