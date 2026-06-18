@@ -5,10 +5,11 @@ Open this file during the live exercise. Your job: wire three pieces of
 production observability so you can see every turn's latency and the
 session's cumulative model usage.
 
-  1. `conversation_item_added` event — read per-turn latency from
-     `ChatMessage.metrics`.
-  2. `session_usage_updated` event — log model usage as it accrues.
-  3. `add_shutdown_callback` — log the cumulative `session.usage` tally
+  1. `metrics_collected` event — log per-turn metrics with
+     `metrics.log_metrics(ev.metrics)`.
+  2. `metrics.UsageCollector` — `collect(ev.metrics)` to accumulate
+     token/audio usage across the call.
+  3. `add_shutdown_callback` — log `usage_collector.get_summary()`
      on disconnect.
 
 Everything else (Moss client, RAG hook, AgentSession) is already wired
@@ -38,27 +39,38 @@ from livekit.plugins.turn_detector.multilingual import MultilingualModel
 from moss import MossClient, QueryOptions
 
 # ── EXERCISE 7 imports ─────────────────────────────────────────────────────
-# You'll need these two event types when you wire the handlers below.
-# Uncomment as you use them.
+# You'll need these when you wire the handlers below. Uncomment as you use them.
 #
-# from livekit.agents import ConversationItemAddedEvent, SessionUsageUpdatedEvent
+# from livekit.agents import MetricsCollectedEvent, metrics
 # ───────────────────────────────────────────────────────────────────────────
 
 load_dotenv()
 
 
+SYSTEM_PROMPT = """\
+You are the voice mind of HeartByte. HeartByte is the working studio of Abhimanyu Selvan, also known as Abhi or diabhey, where he ships production AI agent systems. You are also a small, voice-shaped extension of how Abhi thinks: a curated mind of meditations drawn from philosophers, athletes, builders, and traditions that shape his work.
+
+You are the homepage. People come here instead of reading a static site, so they want a quick, warm conversation. Speak conversationally. Never read URLs, email addresses, or punctuation aloud.
+
+You serve two modes, and the retrieved context tells you which one applies.
+
+FACTUAL MODE. When the context contains documents about HeartByte, Abhi's services, methodology, background, or how to get in touch (document ids without a `phi-` prefix), answer plainly in two or three sentences. Stick to what the context says. Do not invent facts about HeartByte or Abhi.
+
+PHILOSOPHICAL MODE. When the context contains a philosophical principle (document ids prefixed `phi-`), share it as a brief spoken meditation. Name the source, deliver the principle, then close with one sentence that ties it back to building, shipping, or living. You can stretch to four sentences if the principle needs the space. Stay in the voice the principle was written for, calm-direct, matter-of-fact, contemplative, whatever the entry suggests.
+
+If someone asks how to get in touch, say email is best and that the address is on the page. Do not spell out the email aloud.
+
+If someone asks what HeartByte is, say it is the working studio where Abhi ships production AI agent systems, and add that the orb is also where Abhi's working philosophies live, so visitors can ask about both.
+
+If someone asks about the orb itself, you can explain you are built on LiveKit Agents with Moss retrieval, and that you are a live demo of the kind of voice agent Abhi ships for clients.
+
+If the context lacks an answer, say so plainly and offer to point the visitor at Abhi's email for written follow-up. Do not invent.
+"""
+
+
 class HeartByteAgent(Agent):
     def __init__(self, moss_client: MossClient, index_name: str) -> None:
-        super().__init__(
-            instructions=(
-                "You are the voice mind of HeartByte, the working studio of "
-                "Abhimanyu Selvan (Abhi). Answer questions using only the "
-                "context provided in system messages. If the context does not "
-                "contain the answer, say so plainly. Keep replies short, two or "
-                "three sentences. Speak conversationally; do not read URLs, "
-                "emails, or punctuation aloud."
-            ),
-        )
+        super().__init__(instructions=SYSTEM_PROMPT)
         self._moss = moss_client
         self._index_name = index_name
 
@@ -128,20 +140,18 @@ async def entrypoint(ctx: JobContext) -> None:
     # ── EXERCISE 7 ──────────────────────────────────────────────────────────
     # Add three things here:
     #
-    #   (a) @session.on("conversation_item_added") — receives a
-    #       ConversationItemAddedEvent. When `ev.item` is a ChatMessage with
-    #       `role == "assistant"` and `metrics` is set, print
-    #       `e2e_latency` from `ev.item.metrics`.
+    #   (a) Create a usage collector:
+    #       `usage_collector = metrics.UsageCollector()`
     #
-    #   (b) @session.on("session_usage_updated") — receives a
-    #       SessionUsageUpdatedEvent. Iterate `ev.usage.model_usage` and log
-    #       each provider/model usage line.
+    #   (b) @session.on("metrics_collected") — receives a MetricsCollectedEvent.
+    #       Call `metrics.log_metrics(ev.metrics)` to print per-turn metrics,
+    #       then `usage_collector.collect(ev.metrics)` to accumulate usage.
     #
-    #   (c) Define `async def _log_session_summary()` that iterates
-    #       `session.usage.model_usage` and prints the final tally, then
-    #       register it with `ctx.add_shutdown_callback(_log_session_summary)`.
+    #   (c) Define `async def _log_session_summary()` that prints
+    #       `usage_collector.get_summary()`, then register it with
+    #       `ctx.add_shutdown_callback(_log_session_summary)`.
     #
-    # The finished block lives at `agent.py:127`.
+    # The finished block lives next door in `agent.py`.
     # ────────────────────────────────────────────────────────────────────────
 
     await session.start(agent=HeartByteAgent(moss, index_name), room=ctx.room)
