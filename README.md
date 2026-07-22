@@ -4,6 +4,8 @@ Course repo for **Production Voice AI Agents with LiveKit** by Abhimanyu Selvan.
 
 The name comes from the metric that decides whether voice AI feels real: TTS first-byte latency. Every choice in this course is in service of staying under 800 ms first audio out.
 
+> **🎧 Hear the finished thing first: [heartbyte.io](https://heartbyte.io).** Tap the orb and talk to the production deployment of the exact agent this course builds. By the end of Section 5 you'll have deployed your own.
+
 ## Layout
 
 ```
@@ -23,6 +25,8 @@ first-byte/
 The four directories map to course sections 2 through 5 (course Section 1 is the presentation and live demo, no code): `01-hello-voice` is Section 2, `02-production-ux` is Section 3, `03-grounding-moss` is Section 4, and `04-ship-it` is Section 5.
 
 Each `sections/` directory is a self-contained `agent.py` you run with `uv run python sections/<section>/agent.py dev`. They build on each other, but each is also runnable standalone. Sections 4 and 5 also ship an `agent_start.py` stub for the in-class exercises — the parts you'll wire live are marked TODO, and the finished `agent.py` is the reference.
+
+Exercise numbering follows the official course listing: Exercises 1–2 (Section 2), Exercise 3 (Section 3), Exercises 5–6 (Section 4), Exercise 7 (Section 5). There is deliberately no Exercise 4 — the function-tools exercise was cut when the course was scoped to match the production HeartByte orb, which is read-only (see the note at the end of `sections/02-production-ux/README.md`).
 
 The `orb/` directory is the front-end half — a single HTML page using the LiveKit JS SDK and a Three.js sphere. After you've deployed your agent on LiveKit Cloud in Section 5, you'll serve this page locally (`python3 -m http.server`) and tap the orb to talk to your cloud agent. See `orb/README.md` for the three-step setup.
 

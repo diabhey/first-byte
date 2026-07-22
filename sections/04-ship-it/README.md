@@ -31,7 +31,7 @@ async def _log_session_summary() -> None:
 ctx.add_shutdown_callback(_log_session_summary)
 ```
 
-> Note: `metrics_collected` + `metrics.UsageCollector` is the current livekit-agents pattern (verified on v1.3.11). Some docs reference a `session_usage_updated` event / `ChatMessage.metrics`; those are not present in the installed SDK.
+> Note: `metrics_collected` + `metrics.UsageCollector` is the pattern for the pinned livekit-agents 1.3.x this repo installs — it's what's validated and deployed in production. The official course listing (and some newer docs) mention `session_usage_updated` / `ChatMessage.metrics` / `conversation_item_added`; those belong to a later SDK and are **not present in the installed 1.3.x SDK**. Same telemetry, newer surface — what you wire here is the running, production-proven equivalent. If you upgrade the SDK later, re-validate end to end before migrating.
 
 ## Step 2: Deploy
 

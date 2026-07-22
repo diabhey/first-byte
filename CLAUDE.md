@@ -87,9 +87,25 @@ flow both ways between it and this repo.
 ## Testing without a microphone
 
 Agents in `dev`/`start` mode auto-dispatch to new rooms in the LiveKit project.
-Smoke-test loop: run the agent, create a room (`lk room create` or join it),
-publish synthetic speech (`say -o q.wav ... && ffmpeg ... q.ogg`, then
-`lk room join --publish q.ogg <room>`), watch the agent log for transcripts and
-reply speech. Caveat on Abhi's machine: personal LiveKit projects already have
-deployed cloud agents that contend for auto-dispatch with local dev workers —
-students' fresh projects won't have this.
+Smoke-test loop (validated end-to-end 2026-07-22): run the agent, publish
+synthetic speech into a fresh room (`say -o q.aiff ... && ffmpeg ... q.ogg`,
+then `lk room join --identity pub --publish q.ogg <new-room>`), observe. Three
+hard-won rules:
+
+- **Pad clips with trailing silence** (`ffmpeg -af "adelay=2500:all=1,apad=pad_dur=15"`).
+  `lk` unpublishes the track at EOF; without silence flowing after the speech,
+  VAD never sees end-of-speech, the turn never commits, and no reply comes.
+- **The publisher must be the first participant in the room.** The agent's
+  RoomIO links to the first participant's mic; an observer that creates the
+  room steals the link and the agent transcribes nothing.
+- **1.3.x dev logs do not log successful replies** (only user transcripts, at
+  DEBUG). To verify a reply, join a second participant that reads the
+  `lk.transcription` text streams / audio energy, or test with `04-ship-it`,
+  whose handlers print `[metrics]`/`[usage]` lines per turn.
+
+Caveat on Abhi's machine: personal LiveKit projects already have deployed
+cloud agents that contend for auto-dispatch with local dev workers — students'
+fresh projects won't have this. Also: the instructor Moss project sits at its
+index cap, so `build_index.py` fails with USAGE_LIMIT_EXCEEDED; for agent
+smoke tests set `MOSS_INDEX_NAME=heartbyte-io` for load/query only (read-only
+is safe — but NEVER run `build_index.py` against that name).
