@@ -83,7 +83,7 @@ class HeartByteAgent(Agent):
     #   5. Always end with `return await super().on_user_turn_completed(...)`
     #      so the framework continues with the LLM call.
     #
-    # The finished body lives at `agent.py:56`.
+    # The finished body lives at `agent.py:72`.
     # ───────────────────────────────────────────────────────────────────────
 
     # async def on_user_turn_completed(

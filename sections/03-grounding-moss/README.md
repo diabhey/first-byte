@@ -51,7 +51,7 @@ The finished reference is in [`agent.py`](./agent.py). Compare your implementati
 ```python
 async def on_user_turn_completed(self, turn_ctx, new_message):
     query = new_message.text_content
-    results = await self._moss.query(self._index_name, query, QueryOptions(top_k=5))
+    results = await self._moss.query(self._index_name, query, QueryOptions(top_k=5, alpha=0.8))
     if results.docs:
         context_str = "\n".join(f"- {d.text}" for d in results.docs)
         turn_ctx.add_message(
