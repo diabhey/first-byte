@@ -102,6 +102,7 @@ class HeartByteAgent(Agent):
                     "Use this to answer. If the answer is not present, say so."
                 ),
             )
+            print(f"[moss] injected {len(results.docs)} results")
 
         return await super().on_user_turn_completed(turn_ctx, new_message)
 

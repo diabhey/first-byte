@@ -13,7 +13,7 @@ const CONFIG = {
     URL: 'wss://YOUR-PROJECT.livekit.cloud',
 
     // A short-lived LiveKit access token. Generate one:
-    //   $ lk token create \
+    //   $ lk token create --join \
     //       --room heartbyte-orb \
     //       --identity orb-visitor \
     //       --valid-for 24h

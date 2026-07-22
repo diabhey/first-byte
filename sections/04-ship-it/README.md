@@ -76,7 +76,7 @@ Edit `config.js` and fill in three values:
 - `URL`: your LiveKit Cloud `wss://...livekit.cloud` (same one in your `.env`)
 - `TOKEN`: a 24h LiveKit access token for room `heartbyte-orb`:
   ```bash
-  lk token create --room heartbyte-orb --identity orb-visitor --valid-for 24h
+  lk token create --join --room heartbyte-orb --identity orb-visitor --valid-for 24h
   ```
 - `ROOM`: leave as `heartbyte-orb` (default)
 

@@ -33,7 +33,7 @@ Then edit `config.js`:
   locally with the LiveKit CLI you installed in the course prep:
 
   ```bash
-  lk token create \
+  lk token create --join \
     --room heartbyte-orb \
     --identity orb-visitor \
     --valid-for 24h

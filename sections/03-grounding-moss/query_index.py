@@ -15,6 +15,7 @@ clearest demonstration of what alpha does.
 import argparse
 import asyncio
 import os
+import time
 
 from dotenv import load_dotenv
 from moss import MossClient, QueryOptions
@@ -30,7 +31,17 @@ async def main(query: str, top_k: int, alpha: float) -> None:
     client = MossClient(project_id=project_id, project_key=project_key)
     print(f"index={index_name!r}  query={query!r}  top_k={top_k}  alpha={alpha}\n")
 
+    # Pre-load the index in-process, exactly like the agent does at startup.
+    # Without this, query() falls back to a cloud lookup: slower, and a network
+    # dependency this course exists to avoid.
+    t0 = time.perf_counter()
+    await client.load_index(index_name)
+    print(f"(index loaded in-process in {time.perf_counter() - t0:.2f}s)\n")
+
+    t0 = time.perf_counter()
     results = await client.query(index_name, query, QueryOptions(top_k=top_k, alpha=alpha))
+    query_ms = (time.perf_counter() - t0) * 1000
+    print(f"(query ran in {query_ms:.1f} ms in-process)\n")
     if not results.docs:
         print("(no results)")
         return

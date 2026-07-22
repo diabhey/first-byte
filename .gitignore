@@ -34,6 +34,13 @@ htmlcov/
 *.swp
 *~
 
+# Claude Code (local session artifacts; keep shared config like .claude/settings.json committed)
+.claude-logs/
+.claude/settings.local.json
+
+# Instructor-only prep material (this repo is public and student-facing)
+prep/
+
 # OS
 .DS_Store
 Thumbs.db
