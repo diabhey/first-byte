@@ -62,11 +62,12 @@ local test runs, credentials live in `~/.livekit/cli-config.yaml` (LiveKit,
 per-project) and `~/code/heartbyte/hb-agent/.env` (Moss). Prefer exporting env
 vars per command over writing `.env`.
 
-## Doc sync (two copies of the proposal)
+## Doc sync (proposal)
 
-1. `Abhimanyu Selvan - ... Live Course Proposal .md` (repo root) — export of the
-   O'Reilly Google Doc; newest wording/timings.
-2. The Google Doc itself — only Abhi can edit; flag needed changes to him.
+The proposal lives only in the O'Reilly Google Doc — only Abhi can edit; flag
+needed changes to him. The repo copy of the export was purged from git history
+on 2026-07-22 because it contained personal contact details; never re-import
+it without stripping the Contacts section first.
 
 (The old `proposal/` working copy + citation audit were retired in July 2026
 after the audit closed. `prep/` — gitignored, instructor-only; this repo is
@@ -74,9 +75,9 @@ public and student-facing — absorbed the verified facts and sources into
 `master-guide.md`.)
 
 Any change to exercises, APIs, or the deploy story must be reflected in: the
-section README, the section `agent.py`/`agent_start.py`, and the proposal
-export (then flag the Google Doc change to Abhi). README.md yields to the
-proposal when they disagree; code reality wins over both (then update the docs).
+section README, the section `agent.py`/`agent_start.py`, and the Google Doc
+(flag the change to Abhi). README.md yields to the proposal when they
+disagree; code reality wins over both (then update the docs).
 
 ## Related repos
 
