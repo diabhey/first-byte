@@ -4,51 +4,122 @@
 
 Wire production observability, then deploy the agent to LiveKit Cloud Agents with a single command. By the end of this section your agent runs on the public internet against LiveKit's global network and infrastructure.
 
-## Step 1: Wire production metrics (Exercise 7)
+## Step 1: Run with production metrics (Exercise 7)
 
-Open [`agent_start.py`](./agent_start.py). The §3 grounded agent is in place; the three event handlers and shutdown callback are your TODOs. Implement them inside `entrypoint()`, then run:
+The tested §3 grounded agent and its observability handlers are already active
+in [`agent.py`](./agent.py). Stop any earlier section worker, then run:
 
 ```bash
-uv run python sections/04-ship-it/agent_start.py dev
+uv run python sections/04-ship-it/agent.py dev
 ```
 
-The finished reference is in [`agent.py`](./agent.py). Connect via the [Agents Playground](https://agents-playground.livekit.io) and have a conversation. Watch your terminal:
+Connect through the [Agents Playground](https://agents-playground.livekit.io),
+ask two or three HeartByte questions, and read the terminal:
 
-- **per-turn metrics** print on the `metrics_collected` event via `metrics.log_metrics(ev.metrics)`: STT, LLM time-to-first-token, TTS first audio byte, and end-of-utterance delay. This is your latency budget audit in real time.
-- **`[usage] session summary: ...`** logs once on shutdown via `add_shutdown_callback`, from a `metrics.UsageCollector` that accumulated each event. Tokens in/out per model and audio durations.
+- **`[latency]` prints one latency line per turn.** `perceived` measures from
+  the user's last detected speech to the agent's first server-side audio using
+  LiveKit's `ChatMessage.metrics["e2e_latency"]`. The 800 ms `PASS` / `OVER`
+  target applies only to TTS time-to-first-byte (`tts_ttfb`), not to perceived
+  end-to-end latency. The line also shows EOU, STT finalization,
+  retrieval-hook time, and LLM TTFT.
+- **Readable per-turn metrics** print from the `metrics_collected` event: STT,
+  end-of-utterance delay, LLM time-to-first-token, and TTS first audio byte.
+  LiveKit's `metrics.log_metrics()` emits structured fields (often rendered as
+  JSON), which is useful for production ingestion; `_print_metric()` renders
+  the same key values as concise classroom lines.
+- **`[usage] session summary: ...`** logs once on shutdown via
+  `add_shutdown_callback`, from a `metrics.UsageCollector` that accumulated
+  each event. It reports aggregate LLM token totals, STT/TTS audio durations,
+  and TTS character usage for the session.
 
 ```python
 usage_collector = metrics.UsageCollector()
 
 @session.on("metrics_collected")
 def _on_metrics(ev: MetricsCollectedEvent) -> None:
-    metrics.log_metrics(ev.metrics)
+    _print_metric(ev.metrics)
     usage_collector.collect(ev.metrics)
 
 async def _log_session_summary() -> None:
-    print(f"[usage] session summary: {usage_collector.get_summary()}")
+    summary = usage_collector.get_summary()
+    print(
+        "[usage] session summary: "
+        f"llm_prompt={summary.llm_prompt_tokens} "
+        f"llm_completion={summary.llm_completion_tokens} "
+        f"stt_audio={summary.stt_audio_duration:.2f}s "
+        f"tts_audio={summary.tts_audio_duration:.2f}s "
+        f"tts_chars={summary.tts_characters_count}"
+    )
 
 ctx.add_shutdown_callback(_log_session_summary)
 ```
 
-> Note: `metrics_collected` + `metrics.UsageCollector` is the pattern for the pinned livekit-agents 1.3.x this repo installs — it's what's validated and deployed in production. The official course listing (and some newer docs) mention `session_usage_updated` / `ChatMessage.metrics` / `conversation_item_added`; those belong to a later SDK and are **not present in the installed 1.3.x SDK**. Same telemetry, newer surface — what you wire here is the running, production-proven equivalent. If you upgrade the SDK later, re-validate end to end before migrating.
+Example:
 
-## Step 2: Deploy
+```text
+[metrics] STT  audio=2.41s streamed=true
+[metrics] EOU  delay=0.62s transcription=0.21s
+[metrics] LLM  ttft=0.44s prompt=580 completion=42 tokens/s=51.3
+[metrics] TTS  ttfb=0.27s audio=4.31s chars=126
+[latency] perceived=1390ms response=COMPLETE | eou=620ms stt_final=210ms retrieval=10ms llm_ttft=440ms tts_ttfb=270ms tts_target=800ms PASS
+[usage] session summary: llm_prompt=580 llm_completion=42 stt_audio=2.41s tts_audio=4.31s tts_chars=126
+```
+
+The component values are diagnostics, not numbers to add together.
+`stt_final` overlaps the EOU window, and streamed LLM/TTS work can overlap or
+buffer. `perceived` is the SDK's separately measured speech-end → first-audio
+value. It excludes the final network hop and browser playback. The course's
+“under 800 ms” claim refers specifically to `tts_ttfb`.
+
+The `[latency]` line appears when the assistant message is finalized (usually
+after the spoken reply), even though `perceived` records when first audio began.
+
+If the user interrupts after first audio, the end-to-end line is labelled
+`CANCELLED`; interrupted LLM/TTS stage lines use `cancelled=true`. A response
+cancelled before any audio has no first-audio total to report.
+
+Disconnect from the Playground or stop the worker to trigger the shutdown
+callback and print `[usage] session summary: ...`.
+
+Walk through the code after observing the output: the event handler explains
+the per-turn logs; `UsageCollector` and the shutdown callback explain the final
+session rollup. No uncomment/restart cycle is needed in this section.
+
+> Note: pinned livekit-agents 1.3.12 provides `metrics_collected`,
+> `ChatMessage.metrics`, `conversation_item_added`, and
+> `metrics.UsageCollector`; this section uses all four. The newer
+> `session_usage_updated` event is not present in 1.3.12. If you upgrade the
+> SDK later, re-validate the observability flow end to end.
+
+## Step 2: Prepare and deploy
+
+Stop the local worker first. Confirm you are authenticated to the LiveKit Cloud
+project used by this course:
+
+```bash
+lk cloud auth
+```
 
 ```bash
 cd sections/04-ship-it
-lk agent create
+lk agent create --secrets-file=../../.env
 ```
 
-`lk agent create` builds a container image, registers it as a LiveKit Cloud Agent worker, and starts dispatching it to rooms in your project.
+This builds the worker and securely injects the `MOSS_*` values from `.env`.
+LiveKit ignores the project credentials it provides automatically.
 
 After deploy:
 
-1. Open [cloud.livekit.io](https://cloud.livekit.io) and find your new agent.
-2. Set environment variables in the agent's settings: `MOSS_PROJECT_ID`, `MOSS_PROJECT_KEY`, `MOSS_INDEX_NAME`. (The LiveKit and OpenAI/Deepgram/Cartesia credentials are handled by LiveKit Inference automatically.)
-3. Note the agent ID. `lk agent create` writes it to a new `livekit.toml` in this directory. That file is gitignored; copy `livekit.toml.example` as a reference for the shape.
+1. Run `lk agent secrets` to verify the secret names. Values cannot be read
+   back from the CLI or dashboard.
+2. Open [cloud.livekit.io](https://cloud.livekit.io), find the agent, and
+   confirm it becomes healthy.
+3. Note the agent ID. `lk agent create` writes it to a new `livekit.toml` in
+   this directory. That file is gitignored; copy `livekit.toml.example` as a
+   reference for the shape.
 
-For redeploys, `lk agent deploy` reads `livekit.toml` and rolls a new container without touching dashboard secrets.
+For redeploys, `lk agent deploy` reads `livekit.toml` and rolls a new container
+without changing the stored Cloud secrets.
 
 That's it. No Kubernetes manifest, no SSL cert wrangling.
 
@@ -56,7 +127,7 @@ That's it. No Kubernetes manifest, no SSL cert wrangling.
 
 This directory ships as a self-contained deployable Python project so `lk agent create` works without surprises:
 
-- `agent.py` / `agent_start.py` — the worker.
+- `agent.py` — the single grounded worker with observability enabled.
 - `pyproject.toml` + `uv.lock` — pinned deps. Section-local, intentionally separate from the repo-root `pyproject.toml` (which is for the course's dev environment).
 - `Dockerfile` — uses `python:3.13-slim-trixie` (glibc 2.38) with `uv` from astral's image. The default `lk agent create` Dockerfile uses Bookworm (glibc 2.36), which silently fails to install `inferedge-moss-core` because the wheel is `manylinux_2_38_x86_64`. Pre-staging Trixie avoids that 5-minute live debug.
 - `.dockerignore` — keeps `.env`, `.git`, editor files, and coding-agent dotfiles out of the build context.
@@ -71,41 +142,32 @@ cd ../../orb
 cp config.template.js config.js
 ```
 
-Edit `config.js` and fill in three values:
+Edit `config.js` and fill in two values:
 
 - `URL`: your LiveKit Cloud `wss://...livekit.cloud` (same one in your `.env`)
-- `TOKEN`: a 24h LiveKit access token for room `heartbyte-orb`:
+- `TOKEN`: a one-hour LiveKit access token for room `heartbyte-orb`:
   ```bash
-  lk token create --join --room heartbyte-orb --identity orb-visitor --valid-for 24h
+  lk token create --join --room heartbyte-orb --identity orb-visitor --valid-for 1h
   ```
-- `ROOM`: leave as `heartbyte-orb` (default)
 
 Then serve the page:
 
 ```bash
-python3 -m http.server 8000
+python3 -m http.server 8000 --bind 127.0.0.1
 ```
 
 Open <http://localhost:8000> → tap the orb → grant the mic → ask "What is HeartByte?" Your browser connects over WebRTC to your LiveKit Cloud project; LiveKit dispatches your deployed worker to the room; the agent does STT → Moss retrieval → LLM → TTS and the reply streams back. The orb's color and state indicator track listening → thinking → speaking. Tap the orb during a live session to disconnect.
 
-That's the full architecture in three pieces: static webpage (front end), LiveKit Cloud (signaling + dispatch), your agent worker (the brain). All three meet at the room name in your token. The agent you just deployed runs the same KB as [heartbyte.io](https://heartbyte.io) — you are literally talking to the production HeartByte orb running on your own LiveKit project.
+That's the full architecture: static webpage, LiveKit Cloud, and your deployed
+agent meet in the room encoded in the token.
 
 When you ship this for real visitors, you replace the hard-coded token in `config.js` with a server-side token endpoint that mints per-visitor tokens — see Going further below.
 
 ## Going further
 
-- **Custom visitor-facing frontend** — three concrete pieces you'll need, with the patterns I run in production:
-
-  1. **Token endpoint.** Mint short-lived LiveKit JWTs server-side so the secret never reaches the browser. A Cloudflare Pages Function at `/api/token` is the lightest option: ~80 lines of JS, no npm deps, signs the JWT with the Web Crypto API (`crypto.subtle.sign` is native to the Workers runtime). Set `LIVEKIT_API_KEY` / `LIVEKIT_API_SECRET` / `LIVEKIT_URL` as Pages env vars (`wrangler pages secret put`) and your endpoint returns `{ url, token, room }` per request. 15-minute TTL on the token.
-
-  2. **Browser client.** Drop in the [LiveKit JS SDK](https://docs.livekit.io/reference/client-sdk-js/) (`livekit-client` via CDN, no build pipeline needed) and an audio-reactive UI. The agent dispatch happens whenever a room is created, so the orb just calls `room.connect(url, token)`. For the orb itself: a state machine (`idle → connecting → listening → thinking → speaking → error`) wired to LiveKit's `ActiveSpeakersChanged` event, plus a Web Audio `AnalyserNode` reading volume from both the local mic and the remote agent track. Per-frame `getByteFrequencyData()` into a normalized volume drives a canvas / Three.js animation. A `setTimeout` fallback covers the "user stopped, agent hasn't started" thinking state.
-
-  3. **Three security layers, in order of effort.** A public talk-to-me endpoint is wide open by default. Add them as soon as you have real visitors:
-     - **Origin / Sec-Fetch-Site check** inside the Pages Function. Reject anything without `Sec-Fetch-Site: same-origin` or a whitelisted `Origin`. Stops `curl` from anywhere.
-     - **Per-visitor unique rooms.** Instead of one shared room name, generate `<prefix>-<uuid>` per token. A bot in their own room can't disrupt a real visitor in another room. LiveKit Cloud Agents auto-dispatch one worker per new room, no agent code change.
-     - **Cloudflare WAF rate limiting.** Dashboard rule on `/api/token`: e.g. 10 req/min/IP → 429. Stops mass token harvesting before the Pages Function even runs.
-
-  Once these are in place, `lk agent deploy` (the update equivalent of `lk agent create`) lets you ship new agent code without rebuilding the front end or rotating secrets. Same architecture I shipped at [heartbyte.io](https://heartbyte.io) — three repos (static site on CF Pages, Python agent on LiveKit Cloud, Moss for retrieval) meeting at the LiveKit project.
+- **Public frontend**: mint short-lived tokens server-side; never ship API
+  secrets or a long-lived token to the browser.
+- **Isolation**: use a unique room per visitor and rate-limit the token endpoint.
 - **Telephony**: `lk sip` to wire a phone number. Buy a DID via LiveKit Phone Numbers in the Cloud dashboard, set up a dispatch rule, your agent picks up real calls. See [docs.livekit.io/sip](https://docs.livekit.io/sip/).
 - **Vision**: Gemini Live and OpenAI's realtime models support video input. Pass a video track and ask the agent what it sees.
 - **Avatars**: Tavus and Anam render a photorealistic talking head. Plug in via the avatar plugins.
@@ -113,7 +175,8 @@ When you ship this for real visitors, you replace the hard-coded token in `confi
 
 ## Concepts introduced
 
-- `metrics_collected` event + `metrics.log_metrics` for per-turn latency observability
+- `metrics_collected` event + readable per-turn latency formatting
+- speech-end → first-audio observation plus an 800 ms TTS TTFB target
 - `metrics.UsageCollector` for cumulative model-usage rollup
 - `ctx.add_shutdown_callback` for end-of-session reporting
 - `lk agent create` for one-command deploy to LiveKit Cloud Agents

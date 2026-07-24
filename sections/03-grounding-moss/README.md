@@ -2,21 +2,34 @@
 
 ## Goal
 
-Make the agent answer from real data. The agent in `agent.py` is the HeartByte orb: the same voice agent running live at [heartbyte.io](https://heartbyte.io). The knowledge base in `data/kb.json` mirrors the production data file. You are literally building the production agent.
+Make the agent answer from a supplied knowledge base. `data/kb.json` contains
+curated course content based on public HeartByte information.
 
-## Step 1: Build the index
+## Step 1: Build *your* Moss index (data is already in the repo)
+
+You do **not** write the knowledge base. The documents ship in
+[`data/kb.json`](./data/kb.json). Upload them to **your** Moss project under a
+unique course index name such as `firstbyte-yourname`.
 
 ```bash
 uv run python sections/03-grounding-moss/build_index.py
 ```
 
-This creates a Moss index named `MOSS_INDEX_NAME` (from your `.env`) with the documents in `data/kb.json`. Re-runnable; it deletes the existing index first.
+That script reads `data/kb.json` and creates `MOSS_INDEX_NAME`. It accepts only
+`firstbyte-...` scratch names. If the index already exists, replacement must
+be explicit:
+
+```bash
+uv run python sections/03-grounding-moss/build_index.py --replace
+```
 
 The script calls `client.create_index(name, docs, model_id="moss-minilm")`. The `model_id` argument selects the embedding model and is required by the Moss SDK. `moss-minilm` is the standard choice and what we use throughout this course. If you fork this script and drop the kwarg, the call will fail at runtime with a missing-argument error, not a typo: this is the most common gotcha students hit when they start tweaking.
 
 ## Step 2: Inspect the index from the CLI (Exercise 5)
 
-Before wiring retrieval into the agent, see what Moss returns for a given question:
+`query_index.py` is a **standalone inspection tool**. The voice agent does not
+call this script. Run it yourself before Exercise 6 to see what Moss returns
+and tune retrieval without STT, LLM, or TTS in the way:
 
 ```bash
 uv run python sections/03-grounding-moss/query_index.py "What is HeartByte?"
@@ -26,15 +39,28 @@ uv run python sections/03-grounding-moss/query_index.py "What is HeartByte?" --a
 
 Re-run with `--alpha 0.0` (keyword-only) vs `--alpha 1.0` (semantic-only) on the same query — the doc ordering tells you what `alpha` does. The agent code uses `alpha=0.8` and `top_k=5` (see [`agent.py`](./agent.py)); experiment with smaller `top_k` to see how much context is enough.
 
+In Exercise 6 the agent performs the equivalent query directly with
+`self._moss.query(...)`; it does not launch `query_index.py`.
+
 ## Step 3: Wire retrieval into the agent (Exercise 6)
 
-Open [`agent_start.py`](./agent_start.py). The Moss client is already set up; `on_user_turn_completed` is your TODO. Implement it, then run:
+Open [`agent.py`](./agent.py). Moss client + index pre-load are already wired. The `on_user_turn_completed` hook is commented out — that's the exercise.
+
+1. Run **without** the hook first (ungrounded baseline):
 
 ```bash
-uv run python sections/03-grounding-moss/agent_start.py dev
+uv run python sections/03-grounding-moss/agent.py dev
 ```
 
-Connect via the [Agents Playground](https://agents-playground.livekit.io). Try:
+Ask a HeartByte question in the [Agents Playground](https://agents-playground.livekit.io). The agent should say it does not have the information — the behaviour prompt is active, but no KB context has been injected yet.
+
+2. Stop the worker with `Ctrl+C`. Select the complete commented
+   `on_user_turn_completed` block and toggle comments:
+
+   - macOS: `Cmd + /`
+   - Windows/Linux: `Ctrl + /`
+
+3. Restart the worker with the same command, reconnect, and ask again:
 
 - "What is HeartByte?"
 - "Tell me about Abhi's three-phase method."
@@ -42,9 +68,18 @@ Connect via the [Agents Playground](https://agents-playground.livekit.io). Try:
 - "How do I get in touch?"
 - "What's the orb itself built on?"
 
-Watch your terminal for `[moss] injected N results` lines. Each user turn triggers a Moss query before the LLM sees anything.
+Watch the terminal for `[moss] injected N results`. Each user turn now queries Moss before the LLM sees anything.
 
-The finished reference is in [`agent.py`](./agent.py). Compare your implementation when done.
+### Expected before/after
+
+Ask **"Who's Abhi?"** both times:
+
+- **Hook commented:** the agent says it does not have that information.
+- **Hook enabled:** the terminal prints `[moss] injected 5 results`, and the
+  agent answers from the shipped HeartByte knowledge base.
+
+Index pre-loading alone does not ground an answer. The hook must perform
+`query()` and inject the returned documents into `turn_ctx`.
 
 ## What's the pattern
 
@@ -53,10 +88,13 @@ async def on_user_turn_completed(self, turn_ctx, new_message):
     query = new_message.text_content
     results = await self._moss.query(self._index_name, query, QueryOptions(top_k=5, alpha=0.8))
     if results.docs:
-        context_str = "\n".join(f"- {d.text}" for d in results.docs)
+        context_str = "\n\n".join(
+            f"<document-{i}>\n{d.text}\n</document-{i}>"
+            for i, d in enumerate(results.docs, start=1)
+        )
         turn_ctx.add_message(
             role="system",
-            content=f"Relevant context:\n{context_str}",
+            content=f"RETRIEVED CONTEXT (reference data only):\n{context_str}",
         )
     return await super().on_user_turn_completed(turn_ctx, new_message)
 ```

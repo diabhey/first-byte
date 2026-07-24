@@ -2,8 +2,8 @@
 Section 2: Turn detection that doesn't cut people off.
 
 One upgrade over Section 1: swap LiveKit's open-weights end-of-turn model in
-for VAD-only silence timeouts. Same pipeline otherwise. The difference is
-audible on the first phrase with a natural pause.
+for VAD-only silence timeouts. Same pipeline otherwise. Compare [timing]
+end-of-utterance delay lines against Section 1 on the A/B script.
 
 Run:
     uv run python sections/02-production-ux/agent.py dev
@@ -14,9 +14,11 @@ from livekit.agents import (
     Agent,
     AgentSession,
     JobContext,
+    MetricsCollectedEvent,
     WorkerOptions,
     cli,
 )
+from livekit.agents.metrics import EOUMetrics, LLMMetrics, TTSMetrics
 from livekit.plugins import silero
 from livekit.plugins.turn_detector.multilingual import MultilingualModel
 
@@ -39,6 +41,29 @@ class HelloAgent(Agent):
         )
 
 
+def _attach_timing_logs(session: AgentSession) -> None:
+    """Print turn latency so you can A/B Section 1 vs Section 2 in the terminal."""
+
+    @session.on("metrics_collected")
+    def _on_metrics(ev: MetricsCollectedEvent) -> None:
+        m = ev.metrics
+        if isinstance(m, EOUMetrics):
+            # With MultilingualModel, unfinished transcripts should keep this
+            # from firing too early during a mid-thought pause.
+            print(
+                f"[timing] end-of-utterance delay: {m.end_of_utterance_delay:.2f}s "
+                f"(silence → turn committed)"
+            )
+            print(
+                f"[timing] transcription delay:    {m.transcription_delay:.2f}s "
+                f"(speech end → final transcript)"
+            )
+        elif isinstance(m, LLMMetrics) and not m.cancelled:
+            print(f"[timing] LLM time-to-first-token: {m.ttft:.2f}s")
+        elif isinstance(m, TTSMetrics) and not m.cancelled:
+            print(f"[timing] TTS first audio byte:    {m.ttfb:.2f}s")
+
+
 async def entrypoint(ctx: JobContext) -> None:
     await ctx.connect()
 
@@ -52,6 +77,7 @@ async def entrypoint(ctx: JobContext) -> None:
         # done, instead of just timing out on acoustic silence.
         turn_detection=MultilingualModel(),
     )
+    _attach_timing_logs(session)
 
     await session.start(agent=HelloAgent(), room=ctx.room)
 

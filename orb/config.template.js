@@ -16,14 +16,9 @@ const CONFIG = {
     //   $ lk token create --join \
     //       --room heartbyte-orb \
     //       --identity orb-visitor \
-    //       --valid-for 24h
+    //       --valid-for 1h
     // Paste the eyJ... string here.
     TOKEN: 'YOUR_LIVEKIT_TOKEN',
-
-    // The LiveKit room the orb joins. The agent dispatches to this room
-    // automatically when a participant joins. Keep as-is unless you also
-    // change the agent's expected room.
-    ROOM: 'heartbyte-orb',
   },
 };
 

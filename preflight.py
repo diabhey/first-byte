@@ -6,17 +6,19 @@ Run before the live session:
 
 Verifies:
   - Python version is >= 3.11
+  - LiveKit CLI is installed
   - .env is present and populated
   - LiveKit Cloud credentials authenticate
   - Moss credentials authenticate
   - Required Python packages are importable
 
-Every check should be green before class. If a check fails, post in the
-course Discord at least 24 hours before the live session.
+Every check should be green before class.
 """
 
 import asyncio
 import os
+import re
+import shutil
 import sys
 from pathlib import Path
 
@@ -25,6 +27,8 @@ RED = "\033[91m"
 YELLOW = "\033[93m"
 DIM = "\033[2m"
 RESET = "\033[0m"
+MOSS_INDEX_PLACEHOLDER = "firstbyte-your-handle"
+MOSS_INDEX_PATTERN = re.compile(r"firstbyte-[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?")
 
 
 def ok(msg: str) -> None:
@@ -55,6 +59,15 @@ def check_python() -> bool:
     return False
 
 
+def check_livekit_cli() -> bool:
+    section("LiveKit CLI")
+    if shutil.which("lk"):
+        ok("lk command found")
+        return True
+    fail("lk command not found", "Install the LiveKit CLI, then run `lk cloud auth`.")
+    return False
+
+
 def check_env_file() -> bool:
     section("Environment file")
     env_path = Path(__file__).parent / ".env"
@@ -78,7 +91,15 @@ def check_env_vars() -> dict[str, bool]:
     results = {}
     for key in required:
         val = os.environ.get(key, "").strip()
-        if val:
+        if key == "MOSS_INDEX_NAME" and (
+            val == MOSS_INDEX_PLACEHOLDER or MOSS_INDEX_PATTERN.fullmatch(val) is None
+        ):
+            fail(
+                "MOSS_INDEX_NAME is not a course-safe scratch name",
+                "Use a unique name such as `firstbyte-yourname`.",
+            )
+            results[key] = False
+        elif val:
             ok(f"{key} set")
             results[key] = True
         else:
@@ -161,10 +182,11 @@ async def main() -> int:
 
     from dotenv import load_dotenv  # type: ignore
 
-    load_dotenv()
+    load_dotenv(Path(__file__).parent / ".env")
 
     results = []
     results.append(check_python())
+    results.append(check_livekit_cli())
     results.append(check_env_file())
     env_vars_ok = all(check_env_vars().values())
     results.append(env_vars_ok)

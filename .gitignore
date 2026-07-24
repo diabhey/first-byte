@@ -40,6 +40,7 @@ htmlcov/
 
 # Instructor-only prep material (this repo is public and student-facing)
 prep/
+.abhi/
 
 # OS
 .DS_Store
@@ -47,6 +48,7 @@ Thumbs.db
 
 # LiveKit
 .livekit/
+orb/config.js
 
 # Per-student `lk agent create` output. Each student generates their own
 # with their project subdomain + agent ID; the .example file is committed.

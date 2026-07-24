@@ -26,7 +26,7 @@ load_dotenv()
 async def main(query: str, top_k: int, alpha: float) -> None:
     project_id  = os.environ["MOSS_PROJECT_ID"]
     project_key = os.environ["MOSS_PROJECT_KEY"]
-    index_name  = os.environ.get("MOSS_INDEX_NAME", "firstbyte")
+    index_name = os.environ["MOSS_INDEX_NAME"]
 
     client = MossClient(project_id=project_id, project_key=project_key)
     print(f"index={index_name!r}  query={query!r}  top_k={top_k}  alpha={alpha}\n")

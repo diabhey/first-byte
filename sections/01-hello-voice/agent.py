@@ -9,6 +9,7 @@ Run:
     uv run python sections/01-hello-voice/agent.py dev
 
 Then open https://agents-playground.livekit.io and connect.
+Watch the terminal for [timing] lines after each turn.
 """
 
 from dotenv import load_dotenv
@@ -16,9 +17,11 @@ from livekit.agents import (
     Agent,
     AgentSession,
     JobContext,
+    MetricsCollectedEvent,
     WorkerOptions,
     cli,
 )
+from livekit.agents.metrics import EOUMetrics, LLMMetrics, TTSMetrics
 from livekit.plugins import silero
 
 load_dotenv()
@@ -40,6 +43,31 @@ class HelloAgent(Agent):
         )
 
 
+def _attach_timing_logs(session: AgentSession) -> None:
+    """Print turn latency so you can A/B Section 1 vs Section 2 in the terminal."""
+
+    @session.on("metrics_collected")
+    def _on_metrics(ev: MetricsCollectedEvent) -> None:
+        m = ev.metrics
+        if isinstance(m, EOUMetrics):
+            # How long after you stopped speaking before the turn was committed.
+            # On unfinished phrases with a long pause, Section 1 is often large
+            # here because silence alone ended the turn.
+            print(
+                f"[timing] end-of-utterance delay: {m.end_of_utterance_delay:.2f}s "
+                f"(silence → turn committed)"
+            )
+            print(
+                f"[timing] transcription delay:    {m.transcription_delay:.2f}s "
+                f"(speech end → final transcript)"
+            )
+        elif isinstance(m, LLMMetrics) and not m.cancelled:
+            print(f"[timing] LLM time-to-first-token: {m.ttft:.2f}s")
+        elif isinstance(m, TTSMetrics) and not m.cancelled:
+            # Course namesake metric: delay inside TTS until first audio chunk.
+            print(f"[timing] TTS first audio byte:    {m.ttfb:.2f}s")
+
+
 async def entrypoint(ctx: JobContext) -> None:
     await ctx.connect()
 
@@ -49,6 +77,7 @@ async def entrypoint(ctx: JobContext) -> None:
         tts="cartesia/sonic-3",
         vad=silero.VAD.load(),
     )
+    _attach_timing_logs(session)
 
     await session.start(agent=HelloAgent(), room=ctx.room)
 

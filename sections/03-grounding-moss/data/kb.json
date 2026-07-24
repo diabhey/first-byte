@@ -15,7 +15,7 @@
   },
   {
     "id": "abhi-services",
-    "text": "Abhi takes on engagements with AI-native startups to architect, build, and ship production agent systems end to end. He prefers demonstrated proof over promises. Concrete past outcomes include build-time reductions from 27 to 11 minutes, developer onboarding compressed from 15 to 3 minutes, and 750 thousand dollars in ARR generated through partnership work.",
+    "text": "Abhi takes on engagements with AI-native startups to architect, build, and ship production agent systems end to end. He prefers demonstrated proof over promises and focuses on reliable systems, faster delivery, and clear operational ownership.",
     "metadata": {
       "topic": "services"
     }
@@ -36,7 +36,7 @@
   },
   {
     "id": "how-to-get-in-touch",
-    "text": "The best way to reach Abhi is by email at abhimanyuselvan at pm dot me. You can also find him on LinkedIn at linkedin.com/in/abhimanyuselvan, on GitHub at github.com/diabhey, or on Twitter as diabhey. He is based in The Netherlands and operates in Central European Time.",
+    "text": "The best way to reach Abhi is through the contact link on the HeartByte website. He is based in The Netherlands and operates in Central European Time.",
     "metadata": {
       "topic": "contact"
     }
@@ -50,14 +50,14 @@
   },
   {
     "id": "voice-agent-stack",
-    "text": "The orb runs on LiveKit Agents for the voice pipeline and Moss for retrieval. STT, LLM, and TTS are unified through LiveKit Inference. Turn detection uses LiveKit's semantic end-of-turn model. Retrieval runs on every user turn via the on_user_turn_completed hook so answers stay grounded in HeartByte facts. The target is first audio out in under 800 milliseconds.",
+    "text": "The orb runs on LiveKit Agents for the voice pipeline and Moss for retrieval. STT, LLM, and TTS are unified through LiveKit Inference. Turn detection uses LiveKit's semantic end-of-turn model. Retrieval runs on every user turn via the on_user_turn_completed hook so answers stay grounded in HeartByte facts. The course target is TTS time-to-first-byte under 800 milliseconds.",
     "metadata": {
       "topic": "meta"
     }
   },
   {
     "id": "what-can-i-ask",
-    "text": "You can ask the orb anything about HeartByte, about Abhi's background, services, or methodology, or how to get in touch. If you want a written follow-up, the orb will point you at Abhi's email.",
+    "text": "You can ask the orb anything about HeartByte, about Abhi's background, services, or methodology, or how to get in touch. For a written follow-up, use the contact link on the HeartByte website.",
     "metadata": {
       "topic": "meta"
     }

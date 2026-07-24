@@ -3,7 +3,7 @@ name = "first-byte"
 version = "0.1.0"
 description = "Course repo for Production Voice AI Agents with LiveKit"
 authors = [
-    { name = "Abhimanyu Selvan", email = "abhimanyuselvan@pm.me" },
+    { name = "Abhimanyu Selvan" },
 ]
 requires-python = ">=3.11"
 dependencies = [

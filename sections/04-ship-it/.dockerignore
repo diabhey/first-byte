@@ -33,6 +33,7 @@ coverage/
 # Environment variables
 .env
 .env.*
+livekit.toml
 
 # VCS, editor, OS
 .git

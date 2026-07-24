@@ -10,6 +10,8 @@ Fix the one thing every voice demo gets wrong: the agent talking over you when y
 uv run python sections/02-production-ux/agent.py dev
 ```
 
+Same `[timing]` logs as Section 1 — compare `end-of-utterance delay` on the A/B phrases.
+
 ## What changed from Section 1
 
 One line:
@@ -18,13 +20,34 @@ One line:
 turn_detection=MultilingualModel(),
 ```
 
-This is LiveKit's open-weights end-of-turn model. Instead of "stop after N ms of silence" (VAD-only), it uses the STT transcript to predict whether you've actually finished your thought. The difference is dramatic on phrases with natural pauses.
+This is LiveKit's open-weights end-of-turn model. Instead of "stop after N ms of silence" (VAD-only), it uses the STT transcript to predict whether you've actually finished your thought. On unfinished phrases with a long pause, Section 1 often jumps in; this agent should wait.
 
-## Things to try
+**Stop the Section 1 worker first** (`Ctrl+C`). Only one `dev` agent should be running, or both will fight for the same room.
 
-- Say: "Hmm, the thing I want to ask is..." then pause for a beat. With Section 1's agent, you'd already be interrupted. With this one, the agent waits.
-- Say: "What's the weather... in Lisbon?" The pause in the middle no longer triggers a premature reply.
-- Compare back-to-back: run `sections/01-hello-voice/agent.py dev` in one terminal and this one in another, and switch between them in the Playground.
+## A/B turn-taking script (same as Section 1)
+
+Reconnect in the Playground, then repeat the **exact** script and **2 second** pauses from [`../01-hello-voice/README.md`](../01-hello-voice/README.md). Compare your notes.
+
+| # | Say this | Pause | Then | What to watch (Section 2) |
+|---|----------|-------|------|---------------------------|
+| 1 | `What's two plus two?` | — | wait for reply | Control — should feel similar to Section 1. |
+| 2 | `Hmm, the thing I want to ask is` | **2 seconds** (do not continue) | wait | Should **wait**, not invent a reply mid-thought. |
+| 3 | `So my real question is` | **2 seconds** | `how does voice activity detection work?` | Should let you finish after the pause. |
+| 4 | `What's the weather` | **2 seconds** | `in Lisbon?` | Should not answer until after "Lisbon". |
+| 5 | `I was wondering` | **2 seconds** | `whether you can hear me clearly.` | Should hold through the gap. |
+| 6 | Speak over the agent mid-reply | — | — | Barge-in still stops the agent (same as Section 1). |
+| 7 | Stay silent after a full reply | 30 seconds | — | Still quiet — turn detection doesn't make it chatty. |
+
+**How to score:** for #2–#5, count how often Section 1 **jumped in** vs Section 2 **waited**, and compare `[timing] end-of-utterance delay` in the terminal. That delta is the lesson: silence ≠ end of turn. If both waited, lengthen the pause to ~3 seconds and retry #2 and #4 — short pauses often look the same on both agents.
+
+Example terminal output after a turn:
+
+```text
+[timing] end-of-utterance delay: 0.84s (silence → turn committed)
+[timing] transcription delay:    0.31s (speech end → final transcript)
+[timing] LLM time-to-first-token: 0.22s
+[timing] TTS first audio byte:    0.18s
+```
 
 ## Concepts introduced
 
