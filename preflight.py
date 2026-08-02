@@ -28,7 +28,7 @@ YELLOW = "\033[93m"
 DIM = "\033[2m"
 RESET = "\033[0m"
 MOSS_INDEX_PLACEHOLDER = "firstbyte-your-handle"
-MOSS_INDEX_PATTERN = re.compile(r"firstbyte-[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?")
+MOSS_INDEX_PATTERN = re.compile(r"[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?")
 
 
 def ok(msg: str) -> None:
@@ -91,12 +91,17 @@ def check_env_vars() -> dict[str, bool]:
     results = {}
     for key in required:
         val = os.environ.get(key, "").strip()
-        if key == "MOSS_INDEX_NAME" and (
-            val == MOSS_INDEX_PLACEHOLDER or MOSS_INDEX_PATTERN.fullmatch(val) is None
-        ):
+        if key == "MOSS_INDEX_NAME" and val == MOSS_INDEX_PLACEHOLDER:
             fail(
-                "MOSS_INDEX_NAME is not a course-safe scratch name",
-                "Use a unique name such as `firstbyte-yourname`.",
+                "MOSS_INDEX_NAME is still the placeholder",
+                "Set it to your own index name, such as `firstbyte-yourname`.",
+            )
+            results[key] = False
+        elif key == "MOSS_INDEX_NAME" and val and MOSS_INDEX_PATTERN.fullmatch(val) is None:
+            fail(
+                "MOSS_INDEX_NAME is not a valid index name",
+                "Use 1-40 lowercase letters, digits, and hyphens, starting and "
+                "ending with a letter or digit.",
             )
             results[key] = False
         elif val:

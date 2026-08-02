@@ -9,19 +9,22 @@ curated course content based on public HeartByte information.
 
 You do **not** write the knowledge base. The documents ship in
 [`data/kb.json`](./data/kb.json). Upload them to **your** Moss project under a
-unique course index name such as `firstbyte-yourname`.
+unique index name of your choosing, such as `firstbyte-yourname`.
 
 ```bash
 uv run python sections/03-grounding-moss/build_index.py
 ```
 
-That script reads `data/kb.json` and creates `MOSS_INDEX_NAME`. It accepts only
-`firstbyte-...` scratch names. If the index already exists, replacement must
-be explicit:
+That script reads `data/kb.json` and creates `MOSS_INDEX_NAME`. If the index
+already exists, replacement must be explicit:
 
 ```bash
 uv run python sections/03-grounding-moss/build_index.py --replace
 ```
+
+`--replace` deletes the index before recreating it. If your index name does not
+start with `firstbyte-`, the script asks you to retype the name first, so a
+stray `--replace` cannot quietly destroy a real index in your Moss project.
 
 The script calls `client.create_index(name, docs, model_id="moss-minilm")`. The `model_id` argument selects the embedding model and is required by the Moss SDK. `moss-minilm` is the standard choice and what we use throughout this course. If you fork this script and drop the kwarg, the call will fail at runtime with a missing-argument error, not a typo: this is the most common gotcha students hit when they start tweaking.
 

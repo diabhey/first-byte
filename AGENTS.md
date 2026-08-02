@@ -71,8 +71,12 @@ These are deliberate teaching / production choices. Do not "fix" or modernize th
 
 - `build_index.py` creates the configured index and refuses to overwrite it by
   default.
-- It rejects names outside the course-safe `firstbyte-<handle>` pattern.
-- Deletion requires an explicit `--replace` flag.
+- Any valid Moss index name is accepted (lowercase letters, digits, hyphens);
+  only the unedited `.env.example` placeholder is rejected. `firstbyte-<handle>`
+  is a suggested convention, not a requirement.
+- Deletion requires an explicit `--replace` flag. If the index name does not
+  start with `firstbyte-`, `--replace` also requires interactive confirmation
+  (retyping the index name) before deleting.
 - `create_index` requires `model_id="moss-minilm"` — omitting it is a runtime error.
 
 ## Secrets

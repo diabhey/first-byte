@@ -14,6 +14,7 @@ import asyncio
 import json
 import os
 import re
+import sys
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -22,23 +23,43 @@ from moss import DocumentInfo, MossClient
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DATA_PATH = Path(__file__).parent / "data" / "kb.json"
 MOSS_INDEX_PLACEHOLDER = "firstbyte-your-handle"
-MOSS_INDEX_PATTERN = re.compile(r"firstbyte-[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?")
+MOSS_INDEX_PATTERN = re.compile(r"[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?")
+COURSE_INDEX_PREFIX = "firstbyte-"
 
 load_dotenv(REPO_ROOT / ".env")
 
 
 def validate_index_name(index_name: str) -> str:
-    """Allow this destructive course script to touch scratch indexes only."""
     index_name = index_name.strip()
-    if (
-        index_name == MOSS_INDEX_PLACEHOLDER
-        or MOSS_INDEX_PATTERN.fullmatch(index_name) is None
-    ):
+    if index_name == MOSS_INDEX_PLACEHOLDER:
         raise ValueError(
-            "MOSS_INDEX_NAME must be a unique course index such as "
-            "'firstbyte-yourname'."
+            "MOSS_INDEX_NAME is still the .env.example placeholder. Set it to "
+            "your own index name."
+        )
+    if MOSS_INDEX_PATTERN.fullmatch(index_name) is None:
+        raise ValueError(
+            "MOSS_INDEX_NAME must be 1-40 characters of lowercase letters, "
+            "digits, and hyphens, starting and ending with a letter or digit."
         )
     return index_name
+
+
+def confirm_replace(index_name: str) -> None:
+    """Guard --replace against indexes that are not obviously course scratch."""
+    if index_name.startswith(COURSE_INDEX_PREFIX):
+        return
+    if not sys.stdin.isatty():
+        raise RuntimeError(
+            f"Refusing to delete '{index_name}' without confirmation. Names "
+            f"outside the '{COURSE_INDEX_PREFIX}' convention need an "
+            "interactive terminal to confirm."
+        )
+    print(
+        f"\n'{index_name}' is not a '{COURSE_INDEX_PREFIX}' course index.\n"
+        f"--replace will DELETE it and all its documents."
+    )
+    if input("Type the index name to confirm deletion: ").strip() != index_name:
+        raise RuntimeError("Confirmation did not match. Nothing was deleted.")
 
 
 async def main(*, replace: bool = False) -> None:
@@ -62,6 +83,7 @@ async def main(*, replace: bool = False) -> None:
             "only if you intend to delete and recreate it."
         )
     if index_exists:
+        confirm_replace(index_name)
         await client.delete_index(index_name)
         print(f"Deleted existing index '{index_name}'")
 

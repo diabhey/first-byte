@@ -65,7 +65,9 @@ You'll also want **headphones with a microphone** for the live session. Laptop s
 - **LiveKit Cloud**: sign up for the Build plan (free, no credit card required) at [cloud.livekit.io](https://cloud.livekit.io). It covers STT, LLM, and TTS via LiveKit Inference, so no separate provider keys are needed. After signup, run `lk cloud auth` once to link the CLI.
 - **Moss**: sign up at [moss.dev](https://moss.dev) (free tier is enough),
   create a project, copy the project ID and project key, and choose a unique
-  lowercase index name such as `firstbyte-yourname`.
+  lowercase index name. Any name works; `firstbyte-yourname` is a handy
+  convention that also skips the extra confirmation prompt if you ever rebuild
+  the index with `--replace`.
 
 ### 3. Repo
 
