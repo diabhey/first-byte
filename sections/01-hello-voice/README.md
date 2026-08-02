@@ -2,72 +2,65 @@
 
 ## Goal
 
-Boot a voice agent in under 60 seconds and have your first conversation.
+**Start a voice agent, measure the wait to first audio, then feel the broken baseline.**
 
 ## Run
+
+Complete the [root setup and pre-flight check](../../README.md#pre-class-setup) first. Use the same LiveKit Cloud project in the Playground as the one configured in `.env`, and stop any other local workers.
 
 ```bash
 uv run python sections/01-hello-voice/agent.py dev
 ```
 
-Open [agents-playground.livekit.io](https://agents-playground.livekit.io) in another tab. Connect to your local agent. Talk to it. Keep the terminal visible — after each turn it prints `[timing]` lines followed by a `TOTAL` in milliseconds:
+Open [Agents Playground](https://agents-playground.livekit.io), connect, and keep the terminal visible. Use headphones.
+
+## Key takeaway
+>
+> “This is the standard chained voice pipeline: speech recognition, an LLM, then speech synthesis. We are measuring the wait the user actually feels, not just one model call.”
 
 ```text
-[timing] end-of-utterance delay: 0.55s (silence → turn committed)
-[timing] transcription delay:    0.29s (speech end → final transcript)
-[timing] LLM TTFT (first token): 0.61s
-[timing] TTS TTFB (first byte):  0.33s
-[timing] TOTAL end-to-end:       1490ms (speech end → first audio byte)
+You speak → Deepgram STT → GPT-4o-mini → Cartesia TTS → you hear audio
 ```
 
-**TTFT** is time-to-first-token: how long the LLM takes to emit its first token, not to finish the sentence. **TTFB** is time-to-first-byte: how long the TTS takes to return its first chunk of audio, not to synthesize the whole reply. Both measure when output *starts*, because in voice that is the moment the user stops waiting. TTS TTFB is the metric this course is named after, and it is one stage inside the full speech-end → first-audio wait, not the whole of it.
+LiveKit Inference supplies STT, LLM, and TTS from the shorthand model names. Silero VAD runs locally in the worker.
 
-`TOTAL` is the perceived wait from your last word to the agent's first audio. It adds up the end-of-utterance delay, LLM TTFT, and TTS TTFB. Transcription delay is not added: it starts from the same instant as the end-of-utterance delay and already sits inside it, so counting both would double-count the same wait. The greeting has no `TOTAL` because no user turn preceded it.
+## Read the timing
 
-## What's happening under the hood
-
-```bash
-You speak  →  Silero VAD detects start of speech
-           →  Deepgram nova-3 streams transcript          (via LiveKit Inference)
-           →  OpenAI gpt-4o-mini generates reply          (via LiveKit Inference)
-           →  Cartesia sonic-3 streams audio back         (via LiveKit Inference)
-           →  You hear the reply
+```text
+[timing] end-of-utterance delay: ...
+[timing] transcription delay:    ...
+[timing] LLM TTFT (first token): ...
+[timing] TTS TTFB (first byte):  ...
+[timing] TOTAL end-to-end:       ...ms
 ```
 
-The `vad=silero.VAD.load()` line is the only thing not routed through Inference. VAD runs locally in your worker process for latency reasons.
+- **TTFT** is when the LLM starts responding.
+- **TTFB** is when TTS returns its first audio chunk.
+- **`TOTAL`** is this agent's speech-end → first-audio estimate: EOU delay + LLM TTFT + first TTS TTFB. Do not add transcription delay too; it overlaps the EOU window.
+- The greeting has no `TOTAL`, because no user turn preceded it.
 
-## What's deliberately broken here
+## Feel the broken baseline
 
-This agent sets `allow_interruptions=False`, so talking over it does nothing — it finishes its reply no matter what. LiveKit's default is `True`; we switch it off to give Section 2 something to fix.
+This worker deliberately sets:
 
-`discard_audio_if_uninterruptible=True` (the default) makes it worse in a way worth feeling: while the agent is speaking and cannot be interrupted, your audio is dropped rather than buffered. So the agent doesn't just talk over you, it never hears what you said, and you have to repeat yourself once it stops.
+```python
+allow_interruptions=False
+discard_audio_if_uninterruptible=True
+```
 
-Interruption and turn detection are separate systems, which is easy to conflate. Interruption decides when to stop the **agent**; turn detection decides when **you** are finished. Section 2 improves both.
+> **Key point:** turn detection decides when the *user* is done; interruption decides when the *agent* stops. They are separate problems.
 
-## A/B turn-taking script (run this first)
+Try these, and note **jumped in** or **waited**:
 
-Run **only this agent**. Use headphones. In the Playground, connect, then work the script top to bottom. For each line: speak exactly as written, hold the pause silently (count in your head), then either finish the sentence or wait to see if the agent jumps in. Note whether the agent **replied during the pause** (too early) or **waited**.
+1. “What’s two plus two?” — record the `TOTAL`.
+2. “Hmm, the thing I want to ask is” — pause silently for **2 seconds**.
+3. “What’s the weather” — pause **2 seconds**, then finish: “in Lisbon?”
+4. Talk over the agent during any reply.
 
-| # | Say this | Pause | Then | What to watch (Section 1) |
-| --- | -------- | ----- | ---- | ------------------------- |
-| 1 | `What's two plus two?` | — | wait for reply | Control. The `TOTAL` line is that last word → first audio wait; TTS TTFB is only one stage inside it. Note the number and compare later sections against it. |
-| 2 | `Hmm, the thing I want to ask is` | **2 seconds** (do not continue) | wait | Often jumps in mid-thought — silence looked like end of turn. |
-| 3 | `So my real question is` | **2 seconds** | `how does voice activity detection work?` | May cut in during the pause before you finish. |
-| 4 | `What's the weather` | **2 seconds** | `in Lisbon?` | May answer after "weather" before "Lisbon". |
-| 5 | `I was wondering` | **2 seconds** | `whether you can hear me clearly.` | Same: premature reply during the gap. |
-| 6 | Speak over the agent mid-reply on any answer | — | — | Agent talks straight through you and never heard a word of it. `allow_interruptions=False` here — Section 2 fixes it. |
-| 7 | Stay silent after a full reply | 30 seconds | — | Agent should not keep talking unprompted. |
+The silence-only baseline may reply mid-thought. When you talk over it, it keeps speaking and drops your audio. Stop it with `Ctrl+C`, then repeat the same script in [Section 2](../02-production-ux/README.md).
 
-Write down for #2–#5: **jumped in** / **waited**, plus the terminal's `[timing] end-of-utterance delay` value when a reply does fire. That number is how long after you stopped speaking before the turn was committed — on premature replies it often lands near your pause length.
+## Concepts
 
-Then stop this worker (`Ctrl+C`), run Section 2 with the **same script and same pause lengths**, and compare both the feel and those EOU delay lines.
-
-Section 2 adds semantic turn detection so #2–#5 should wait more often. The gap can be subtle with short pauses — use the full **2 second** holds.
-
-## Concepts introduced
-
-- `AgentSession` orchestrates the STT → LLM → TTS pipeline
-- `Agent` defines instructions and reasoning behavior
-- `JobContext` is the per-room handle the worker gives your entrypoint
-- `WorkerOptions` registers your entrypoint with the LiveKit dispatch
-- LiveKit Inference: zero-config provider access via shorthand strings like `"deepgram/nova-3:en"`
+- `AgentSession` runs the STT → LLM → TTS pipeline.
+- `Agent` contains instructions and response behavior.
+- `JobContext` is the room handle; `WorkerOptions` registers the worker entrypoint.
