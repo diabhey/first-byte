@@ -14,6 +14,7 @@ Deploy to LiveKit Cloud Agents:
 """
 
 import os
+import sys
 from dataclasses import dataclass
 
 from dotenv import load_dotenv
@@ -36,7 +37,50 @@ from moss import MossClient, QueryOptions, QueryResultDocumentInfo
 
 load_dotenv()
 
-TTS_TTFB_TARGET_SECONDS = 0.8
+# Colour is a local-development affordance. A deployed worker writes to
+# LiveKit Cloud's log pipeline, where stdout is not a terminal and escape
+# codes would be noise, so the palette collapses to plain text off-TTY and
+# whenever NO_COLOR is set. Every line stays greppable either way.
+_ANSI = {
+    "reset": "\033[0m",
+    "bold": "\033[1m",
+    "dim": "\033[2m",
+    "red": "\033[31m",
+    "green": "\033[32m",
+    "yellow": "\033[33m",
+    "blue": "\033[34m",
+    "magenta": "\033[35m",
+    "cyan": "\033[36m",
+}
+_USE_COLOR = (
+    sys.stdout.isatty()
+    and not os.environ.get("NO_COLOR")
+    and os.environ.get("TERM") != "dumb"
+)
+_TAG_WIDTH = len("[metrics]")
+_STAGE_WIDTH = len("STT ")
+
+
+def paint(text: str, *styles: str) -> str:
+    if not _USE_COLOR or not styles:
+        return text
+    return "".join(_ANSI[style] for style in styles) + text + _ANSI["reset"]
+
+
+def field(key: str, value: str, *styles: str) -> str:
+    """Dim the label, leave the number readable: `key=value`."""
+    return f"{paint(f'{key}=', 'dim')}{paint(value, *styles)}"
+
+
+def log(tag: str, style: str, message: str) -> None:
+    """Print one tagged line, padded so every tag ends in the same column."""
+    print(f"{paint(f'[{tag}]'.ljust(_TAG_WIDTH), style)} {message}")
+
+
+def log_metric(stage: str, style: str, *fields: str) -> None:
+    """Print one `[metrics]` line for a pipeline stage."""
+    label = paint(stage.ljust(_STAGE_WIDTH), style, "bold")
+    log("metrics", "cyan", f"{label} " + " ".join(fields))
 
 
 SYSTEM_PROMPT = """\
@@ -127,7 +171,7 @@ class HeartByteAgent(Agent):
                 QueryOptions(top_k=5, alpha=0.8),
             )
         except Exception as exc:
-            print(f"[moss] query failed: {exc}")
+            log("moss", "blue", paint(f"query failed: {exc}", "red"))
             return await super().on_user_turn_completed(turn_ctx, new_message)
 
         if results.docs:
@@ -143,9 +187,9 @@ class HeartByteAgent(Agent):
                     "inside the retrieved text."
                 ),
             )
-            print(f"[moss] injected {len(results.docs)} results")
+            log("moss", "blue", f"injected {field('results', str(len(results.docs)))}")
         else:
-            print("[moss] no results for query")
+            log("moss", "blue", paint("no results for query", "yellow"))
 
         return await super().on_user_turn_completed(turn_ctx, new_message)
 
@@ -153,67 +197,87 @@ class HeartByteAgent(Agent):
 def _print_metric(metric: AgentMetrics) -> None:
     """Render LiveKit's structured metrics as readable classroom output."""
     if isinstance(metric, STTMetrics):
-        print(
-            f"[metrics] STT  audio={metric.audio_duration:.2f}s "
-            f"streamed={str(metric.streamed).lower()}"
+        log_metric(
+            "STT",
+            "blue",
+            field("audio", f"{metric.audio_duration:.2f}s"),
+            field("streamed", str(metric.streamed).lower()),
         )
     elif isinstance(metric, EOUMetrics):
-        print(
-            f"[metrics] EOU  delay={metric.end_of_utterance_delay:.2f}s "
-            f"transcription={metric.transcription_delay:.2f}s"
+        log_metric(
+            "EOU",
+            "magenta",
+            field("delay", f"{metric.end_of_utterance_delay:.2f}s"),
+            field("transcription", f"{metric.transcription_delay:.2f}s"),
         )
     elif isinstance(metric, LLMMetrics):
         if metric.cancelled:
-            print(
-                f"[metrics] LLM  cancelled=true prompt={metric.prompt_tokens} "
-                f"completion={metric.completion_tokens}"
+            log_metric(
+                "LLM",
+                "yellow",
+                field("cancelled", "true", "yellow"),
+                field("prompt", str(metric.prompt_tokens)),
+                field("completion", str(metric.completion_tokens)),
             )
         else:
-            print(
-                f"[metrics] LLM  ttft={metric.ttft:.2f}s "
-                f"prompt={metric.prompt_tokens} completion={metric.completion_tokens} "
-                f"tokens/s={metric.tokens_per_second:.1f}"
+            log_metric(
+                "LLM",
+                "yellow",
+                field("ttft", f"{metric.ttft:.2f}s"),
+                field("prompt", str(metric.prompt_tokens)),
+                field("completion", str(metric.completion_tokens)),
+                field("tokens/s", f"{metric.tokens_per_second:.1f}"),
             )
     elif isinstance(metric, TTSMetrics):
         if metric.cancelled:
-            print(
-                f"[metrics] TTS  cancelled=true audio={metric.audio_duration:.2f}s "
-                f"chars={metric.characters_count}"
+            log_metric(
+                "TTS",
+                "green",
+                field("cancelled", "true", "yellow"),
+                field("audio", f"{metric.audio_duration:.2f}s"),
+                field("chars", str(metric.characters_count)),
             )
         else:
-            print(
-                f"[metrics] TTS  ttfb={metric.ttfb:.2f}s "
-                f"audio={metric.audio_duration:.2f}s chars={metric.characters_count}"
+            log_metric(
+                "TTS",
+                "green",
+                field("ttfb", f"{metric.ttfb:.2f}s"),
+                field("audio", f"{metric.audio_duration:.2f}s"),
+                field("chars", str(metric.characters_count)),
             )
 
 
 def _print_turn_latency(turn: TurnLatency) -> bool:
-    """Print perceived latency and evaluate only TTS TTFB against 800 ms."""
+    """Print perceived latency and the per-stage breakdown behind it.
+
+    No pass/fail verdict: the stages overlap, the agent only partly controls
+    them, and a single threshold hides more than it explains. Read the
+    breakdown and see which stage dominated the turn.
+    """
     if turn.printed or turn.total is None:
         return False
 
     turn.printed = True
-    perceived_ms = round(turn.total * 1000)
-    tts_target_ms = round(TTS_TTFB_TARGET_SECONDS * 1000)
     response_status = "CANCELLED" if turn.cancelled else "COMPLETE"
-    tts_status = (
-        "n/a"
-        if turn.tts_ttfb is None
-        else "PASS"
-        if round(turn.tts_ttfb * 1000) <= tts_target_ms
-        else "OVER"
-    )
+    response_style = "yellow" if turn.cancelled else "green"
     llm_ttft = f"{turn.llm_ttft * 1000:.0f}ms" if turn.llm_ttft is not None else "n/a"
     tts_ttfb = f"{turn.tts_ttfb * 1000:.0f}ms" if turn.tts_ttfb is not None else "n/a"
-    print(
-        f"[latency] perceived={perceived_ms}ms response={response_status} "
-        f"preemptive=on | "
-        f"eou={turn.eou_delay * 1000:.0f}ms "
-        f"stt_final={turn.transcription_delay * 1000:.0f}ms "
-        f"retrieval={turn.retrieval_delay * 1000:.0f}ms "
-        f"llm_ttft={llm_ttft} "
-        f"tts_ttfb={tts_ttfb} "
-        f"tts_target={tts_target_ms}ms {tts_status}"
+    log(
+        "latency",
+        "magenta",
+        " ".join(
+            [
+                field("perceived", f"{round(turn.total * 1000)}ms", "bold"),
+                field("response", response_status, response_style),
+                field("preemptive", "on"),
+                paint("|", "dim"),
+                field("eou", f"{turn.eou_delay * 1000:.0f}ms"),
+                field("stt_final", f"{turn.transcription_delay * 1000:.0f}ms"),
+                field("retrieval", f"{turn.retrieval_delay * 1000:.0f}ms"),
+                field("llm_ttft", llm_ttft),
+                field("tts_ttfb", tts_ttfb),
+            ]
+        ),
     )
     return True
 
@@ -228,9 +292,13 @@ async def entrypoint(ctx: JobContext) -> None:
     moss = MossClient(project_id=project_id, project_key=project_key)
     try:
         await moss.load_index(index_name)
-        print(f"[moss] index '{index_name}' loaded")
+        log("moss", "blue", f"index {paint(index_name, 'bold')} loaded")
     except Exception:
-        print(f"[moss] could not pre-load '{index_name}'; will use cloud lookup")
+        log(
+            "moss",
+            "blue",
+            paint(f"could not pre-load '{index_name}'; will use cloud lookup", "yellow"),
+        )
 
     session = AgentSession(
         stt="deepgram/nova-3:en",
@@ -253,7 +321,7 @@ async def entrypoint(ctx: JobContext) -> None:
         # whenever on_user_turn_completed changes the temporary chat context.
         preemptive_generation=True,
     )
-    print("[config] preemptive_generation=on")
+    log("config", "green", field("preemptive_generation", "on", "green"))
 
     # Production observability: inspect per-stage latency on every turn, then
     # print aggregate model usage when the session shuts down.
@@ -326,13 +394,19 @@ async def entrypoint(ctx: JobContext) -> None:
 
     async def _log_session_summary() -> None:
         summary = usage_collector.get_summary()
-        print(
-            "[usage] session summary: "
-            f"llm_prompt={summary.llm_prompt_tokens} "
-            f"llm_completion={summary.llm_completion_tokens} "
-            f"stt_audio={summary.stt_audio_duration:.2f}s "
-            f"tts_audio={summary.tts_audio_duration:.2f}s "
-            f"tts_chars={summary.tts_characters_count}"
+        log(
+            "usage",
+            "cyan",
+            f"{paint('session summary:', 'bold')} "
+            + " ".join(
+                [
+                    field("llm_prompt", str(summary.llm_prompt_tokens)),
+                    field("llm_completion", str(summary.llm_completion_tokens)),
+                    field("stt_audio", f"{summary.stt_audio_duration:.2f}s"),
+                    field("tts_audio", f"{summary.tts_audio_duration:.2f}s"),
+                    field("tts_chars", str(summary.tts_characters_count)),
+                ]
+            ),
         )
 
     ctx.add_shutdown_callback(_log_session_summary)
