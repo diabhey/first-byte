@@ -100,6 +100,16 @@ These are deliberate teaching / production choices. Do not "fix" or modernize th
 
 ## Doc sync
 
+Three docs, three readers, no overlap:
+
+- `SYLLABUS.md` — what the course covers and what students will learn. Prose
+  only; no commands, no code blocks. Mirrors the O'Reilly listing.
+- `README.md` — how to set up, run, and deploy. Owns the setup commands.
+- `sections/*/README.md` — what to do in one section, and what to watch happen.
+
+Commands belong in the README and the section READMEs. The syllabus links to
+them instead of repeating them.
+
 Any change to exercises, APIs, or the deploy story must be reflected in:
 
 1. the section README

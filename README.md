@@ -10,11 +10,15 @@ transcription, retrieval, and LLM work.
 > **🎧 Hear the finished experience: [heartbyte.io](https://heartbyte.io).**
 > The course builds a self-contained version with curated course data.
 
+[`SYLLABUS.md`](./SYLLABUS.md) covers what the course teaches and how the two
+hours are structured. This README covers setup and the commands you run.
+
 ## Layout
 
 ```bash
 first-byte/
 ├── pyproject.toml          # uv-managed deps for every section
+├── SYLLABUS.md             # Course description, objectives, and schedule
 ├── AGENTS.md               # Instructions for coding agents working on this repo
 ├── .env.example            # Template for credentials
 ├── preflight.py            # Verifies your setup before class
@@ -136,4 +140,5 @@ Then follow `orb/README.md` to test the deployed agent. Subsequent updates use
 - [Agents Playground](https://agents-playground.livekit.io/)
 - [Moss docs](https://docs.moss.dev)
 - [ArchByte architecture visualization](https://archbyte.heartbyte.io/)
+- [`SYLLABUS.md`](./SYLLABUS.md) — course description, objectives, and schedule
 - [`AGENTS.md`](./AGENTS.md) — guidance for coding agents editing this repo
