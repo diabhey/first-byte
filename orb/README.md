@@ -4,7 +4,7 @@ A minimal single-page voice client that visitors talk to. Pairs with the
 deployed agent from `sections/04-ship-it/`. Same `LIVEKIT_URL`, same room,
 two halves meeting at LiveKit Cloud:
 
-```
+```text
 browser <── WebRTC ──>  LiveKit Cloud  ── dispatch ──>  agent worker
 (orb)                   room "heartbyte-orb"          (your deployed agent)
 ```

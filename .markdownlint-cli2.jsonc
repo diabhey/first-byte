@@ -1,0 +1,18 @@
+{
+  // Course docs only: dependency READMEs inside the section virtualenvs and
+  // personal scratch notes are not ours to lint.
+  "globs": [
+    "**/*.md",
+    "!**/.venv/**",
+    "!**/node_modules/**",
+    "!.abhi/**"
+  ],
+  "config": {
+    "default": true,
+    // Off rather than raised. The A/B script tables carry a full sentence of
+    // guidance per row and cannot wrap, the shell snippets are meant to be
+    // copy-pasted intact, and the prose is written one paragraph per line so
+    // that editing a sentence does not reflow the paragraph around it.
+    "MD013": false
+  }
+}

@@ -65,7 +65,7 @@ Interruption decides when to stop the **agent**; turn detection decides when
 Run **only this agent**. Use headphones. In the Playground, connect, then work the script top to bottom. For each line: speak exactly as written, hold the pause silently (count in your head), then either finish the sentence or wait to see if the agent jumps in. Note whether the agent **replied during the pause** (too early) or **waited**.
 
 | # | Say this | Pause | Then | What to watch (Section 1) |
-|---|----------|-------|------|---------------------------|
+| --- | -------- | ----- | ---- | ------------------------- |
 | 1 | `What's two plus two?` | — | wait for reply | Control. The `TOTAL` line is that last word → first audio wait; it includes far more than TTS TTFB, so do not compare it with the course's 800 ms TTS target. |
 | 2 | `Hmm, the thing I want to ask is` | **2 seconds** (do not continue) | wait | Often jumps in mid-thought — silence looked like end of turn. |
 | 3 | `So my real question is` | **2 seconds** | `how does voice activity detection work?` | May cut in during the pause before you finish. |
