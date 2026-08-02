@@ -2,7 +2,7 @@
 Build the Moss index for Section 3.
 
 Reads sections/03-grounding-moss/data/kb.json and creates (or replaces) a
-Moss index with the documents inside. Run once before Exercise 5:
+Moss index with the documents inside. Run once before Exercise 4:
 
     uv run python sections/03-grounding-moss/build_index.py
 

@@ -77,8 +77,8 @@ Code: `sections/02-production-ux/`
 Code: `sections/03-grounding-moss/`
 
 - **Presentation (5 min).** Why voice agents need retrieval: why retrieve-as-tool patterns add an extra LLM round-trip you can't afford in voice, how hosted vector databases add 300 to 900 ms of dead air per turn against Moss's claimed sub-10 ms p99 in-process with zero network hops, and the principle of retrieving always and letting the LLM decide what to use.
-- **Exercise 5 (10 min).** Build a Moss index for the HeartByte orb. Install the Moss SDK, build the index from the shipped knowledge base, query it directly, and inspect scores while tuning alpha and top-k.
-- **Exercise 6 (12 min).** Wire `on_user_turn_completed` for unconditional retrieval. Override the hook, query Moss on every user turn, inject the results as a system message, then ask about HeartByte and watch grounded answers arrive in real time.
+- **Exercise 4 (10 min).** Build a Moss index for the HeartByte orb. Install the Moss SDK, build the index from the shipped knowledge base, query it directly, and inspect scores while tuning alpha and top-k.
+- **Exercise 5 (12 min).** Wire `on_user_turn_completed` for unconditional retrieval. Override the hook, query Moss on every user turn, inject the results as a system message, then ask about HeartByte and watch grounded answers arrive in real time.
 - **Q&A (3 min).**
 
 ### Section 5: Observability and deployment (20 min)
@@ -86,7 +86,7 @@ Code: `sections/03-grounding-moss/`
 Code: `sections/04-ship-it/`
 
 - **Presentation (5 min).** Observability for voice agents: the per-turn latency breakdown across STT first byte, LLM time-to-first-token, and TTS first audio chunk; session-level usage rollups; and the principle of observability *before* deploy, not after.
-- **Exercise 7 (7 min).** Wire production metrics. Read per-turn latency from `ChatMessage.metrics`, collect cumulative model usage, and register a shutdown callback for an end-of-session summary.
+- **Exercise 6 (7 min).** Wire production metrics. Read per-turn latency from `ChatMessage.metrics`, collect cumulative model usage, and register a shutdown callback for an end-of-session summary.
 - **Live walkthrough (5 min).** Deploy with one command. It builds, ships, and registers your agent on LiveKit Cloud's global infrastructure; the section directory is pre-staged as a self-contained deployable project so the build hits the LiveKit Cloud cache and stays inside the demo window. Then serve the included orb page locally, paste in a LiveKit token, and tap the orb to talk to your cloud-deployed agent end to end — the same three pieces you need in production: a static page, LiveKit Cloud, and an agent worker.
 - **Going further (3 min).** Wiring the visitor-facing half on Cloudflare Pages with per-visitor tokens minted server-side; the three security layers a public voice page needs (origin checks on the token endpoint, per-visitor room names, and edge rate limiting); the audio-reactive UI state machine driven from analyser taps on both microphone and agent audio; multi-agent handoffs; telephony over SIP; vision-enabled realtime models; photoreal avatars; and self-hosting LiveKit Server.
 - **Final Q&A (5 min).**

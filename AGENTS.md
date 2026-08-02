@@ -66,7 +66,7 @@ These are deliberate teaching / production choices. Do not "fix" or modernize th
 
 - Prefer clear, teachable diffs over clever refactors.
 - Keep each section's `agent.py` runnable standalone.
-- `03-grounding-moss`: Exercise 6 is the commented `on_user_turn_completed` in `agent.py` — leave it commented in the shipped tree; students uncomment live.
+- `03-grounding-moss`: Exercise 5 is the commented `on_user_turn_completed` in `agent.py` — leave it commented in the shipped tree; students uncomment live.
 - `04-ship-it`: observability is active by default. Students run the complete grounded agent, inspect per-turn metrics and the shutdown usage summary, then deploy the same worker.
 - Match existing patterns: short instructions, Inference model strings (`deepgram/...`, `openai/...`, `cartesia/...`), Silero VAD, optional `MultilingualModel` turn detection.
 

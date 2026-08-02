@@ -28,9 +28,9 @@ first-byte/
 
 The four directories map to course sections 2 through 5 (course Section 1 is the presentation and live demo, no code): `01-hello-voice` is course Section 2, `02-production-ux` is course Section 3, `03-grounding-moss` is course Section 4, and `04-ship-it` is course Section 5. Inside each directory, the local README labels itself by directory order (`Section 1` … `Section 4`) — when in doubt, use the path.
 
-Each `sections/` directory has one self-contained `agent.py` you run with `uv run python sections/<dir>/agent.py dev`. They build on each other, but each is also runnable standalone. In `03-grounding-moss`, Exercise 6 is the commented `on_user_turn_completed` hook (uncomment to enable RAG). In `04-ship-it`, observability is already enabled: run it, inspect the per-turn metrics and shutdown usage summary, then deploy that same worker.
+Each `sections/` directory has one self-contained `agent.py` you run with `uv run python sections/<dir>/agent.py dev`. They build on each other, but each is also runnable standalone. In `03-grounding-moss`, Exercise 5 is the commented `on_user_turn_completed` hook (uncomment to enable RAG). In `04-ship-it`, observability is already enabled: run it, inspect the per-turn metrics and shutdown usage summary, then deploy that same worker.
 
-Exercise numbering follows the official course listing: Exercises 1–2 (Section 2), Exercise 3 (Section 3), Exercises 5–6 (Section 4), and Exercise 7 (Section 5). There is no Exercise 4; this course builds a read-only agent.
+Exercise numbering follows the course listing: Exercises 1–2 (Section 2), Exercise 3 (Section 3), Exercises 4–5 (Section 4), and Exercise 6 (Section 5). This course builds a read-only agent.
 
 The `orb/` directory is the browser client. After deployment, serve it locally with `python3 -m http.server 8000 --bind 127.0.0.1`. See `orb/README.md`.
 

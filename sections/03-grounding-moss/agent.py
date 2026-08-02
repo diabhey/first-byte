@@ -1,7 +1,7 @@
 """
 Section 3: Grounding with Moss.
 
-Moss client + index pre-load are wired. Exercise 6: uncomment
+Moss client + index pre-load are wired. Exercise 5: uncomment
 `on_user_turn_completed` below so Moss runs on EVERY user turn, before the
 LLM, and injects top results as a system message.
 
@@ -96,7 +96,7 @@ class HeartByteAgent(Agent):
             ),
         )
 
-    # ── EXERCISE 6 ─────────────────────────────────────────────────────────
+    # ── EXERCISE 5 ─────────────────────────────────────────────────────────
     # Uncomment `on_user_turn_completed` to ground every turn in Moss.
     # Without it, the agent still talks but cannot answer KB questions.
     # With it: retrieve every turn → inject system context → super().
@@ -166,7 +166,7 @@ def _attach_timing_logs(session: AgentSession) -> None:
                 f"[timing] transcription delay:    {m.transcription_delay:.2f}s "
                 f"(speech end → final transcript)"
             )
-            # Near zero until Exercise 6 is uncommented; this is the price of
+            # Near zero until Exercise 5 is uncommented; this is the price of
             # grounding every turn.
             print(
                 f"[timing] Moss retrieval:         "

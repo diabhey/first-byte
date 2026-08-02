@@ -1,7 +1,7 @@
 """
 Query the Moss index from the CLI to see what comes back for a given
-question. Use this in Exercise 5 to inspect scores and tune `alpha` and
-`top_k` before wiring retrieval into the agent in Exercise 6.
+question. Use this in Exercise 4 to inspect scores and tune `alpha` and
+`top_k` before wiring retrieval into the agent in Exercise 5.
 
 Usage:
     uv run python sections/03-grounding-moss/query_index.py "What is HeartByte?"
