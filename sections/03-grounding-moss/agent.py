@@ -34,7 +34,7 @@ from livekit.agents import (
 from livekit.agents.metrics import EOUMetrics, LLMMetrics, TTSMetrics
 from livekit.plugins import silero
 from livekit.plugins.turn_detector.multilingual import MultilingualModel
-from moss import MossClient, QueryOptions
+from moss import MossClient, QueryOptions, QueryResultDocumentInfo
 
 load_dotenv()
 
@@ -51,6 +51,8 @@ SPOKEN STYLE
 GROUNDING
 - Retrieved reference material arrives in a system message headed
   "RETRIEVED CONTEXT".
+- Each document may carry a source attribute. That attribute is the only
+  attribution you may use; never invent one for a document without it.
 - Use only claims and source attribution supported by that context, including
   for questions about HeartByte, Abhi, and philosophical principles.
 - Do not fill gaps from memory or guess.
@@ -63,6 +65,19 @@ RESPONSE MODE
 - For philosophical context, name the source when provided, state the
   principle, and connect it to building, shipping, or living.
 """
+
+
+def format_document(index: int, doc: QueryResultDocumentInfo) -> str:
+    """Wrap one retrieved document, carrying its source through to the LLM.
+
+    The prompt asks the agent to attribute philosophical answers, but the
+    document text usually does not say who said it — that lives in Moss
+    metadata. Drop the metadata and the model has to invent an attribution or
+    skip it, so the source travels with the text as an attribute.
+    """
+    source = (doc.metadata or {}).get("source")
+    label = f' source="{source.replace("-", " ").title()}"' if source else ""
+    return f"<document-{index}{label}>\n{doc.text}\n</document-{index}>"
 
 
 class HeartByteAgent(Agent):
@@ -84,6 +99,7 @@ class HeartByteAgent(Agent):
     # Uncomment `on_user_turn_completed` to ground every turn in Moss.
     # Without it, the agent still talks but cannot answer KB questions.
     # With it: retrieve every turn → inject system context → super().
+    # `format_document` above decides what the LLM actually sees per hit.
     # ───────────────────────────────────────────────────────────────────────
 
     # async def on_user_turn_completed(
@@ -108,7 +124,7 @@ class HeartByteAgent(Agent):
     #
     #     if results.docs:
     #         context_str = "\n\n".join(
-    #             f"<document-{i}>\n{d.text}\n</document-{i}>"
+    #             format_document(i, d)
     #             for i, d in enumerate(results.docs, start=1)
     #         )
     #         turn_ctx.add_message(

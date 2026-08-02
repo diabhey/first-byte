@@ -110,13 +110,18 @@ Index pre-loading alone does not ground an answer. The hook must perform
 ## What's the pattern
 
 ```python
+def format_document(index, doc):
+    source = (doc.metadata or {}).get("source")
+    label = f' source="{source.replace("-", " ").title()}"' if source else ""
+    return f"<document-{index}{label}>\n{doc.text}\n</document-{index}>"
+
+
 async def on_user_turn_completed(self, turn_ctx, new_message):
     query = new_message.text_content
     results = await self._moss.query(self._index_name, query, QueryOptions(top_k=5, alpha=0.8))
     if results.docs:
         context_str = "\n\n".join(
-            f"<document-{i}>\n{d.text}\n</document-{i}>"
-            for i, d in enumerate(results.docs, start=1)
+            format_document(i, d) for i, d in enumerate(results.docs, start=1)
         )
         turn_ctx.add_message(
             role="system",
@@ -125,11 +130,12 @@ async def on_user_turn_completed(self, turn_ctx, new_message):
     return await super().on_user_turn_completed(turn_ctx, new_message)
 ```
 
-Three things to internalize:
+Four things to internalize:
 
 1. **Retrieval runs every turn, not via a tool.** A function tool requires the LLM to decide to retrieve. That's a round-trip you can't afford in voice. Cheaper to retrieve unconditionally.
 2. **Inject as a system message in `turn_ctx`, not as user text.** This keeps the user's actual words intact and the LLM treats the context as authoritative.
-3. **Call `super().on_user_turn_completed(...)` at the end.** This hands control back to the framework so the LLM call runs as normal.
+3. **Pass the metadata the prompt depends on.** The system prompt asks the agent to name a source for philosophical answers, but most documents don't state their author in the body text — `bruce-lee` lives in `doc.metadata`. Inject text alone and the model either invents an attribution or drops it. Anything your prompt promises has to actually reach the model.
+4. **Call `super().on_user_turn_completed(...)` at the end.** This hands control back to the framework so the LLM call runs as normal.
 
 ## Why Moss specifically
 
