@@ -24,6 +24,40 @@ turn_detection=MultilingualModel(),
 
 This is LiveKit's open-weights end-of-turn model. Instead of "stop after N ms of silence" (VAD-only), it uses the STT transcript to predict whether you've actually finished your thought. On unfinished phrases with a long pause, Section 1 often jumps in; this agent should wait.
 
+Concretely, it picks between two timeouts. The default wait is
+`min_endpointing_delay` (0.5s); if the model's end-of-turn probability falls
+below a per-language threshold (0.011 for English), it switches to
+`max_endpointing_delay` (3.0s) and keeps listening.
+
+**2. When the *agent* should stop — barge-in, off in Section 1:**
+
+```python
+allow_interruptions=True,
+discard_audio_if_uninterruptible=False,
+min_interruption_duration=0.7,
+min_interruption_words=2,
+false_interruption_timeout=2.0,
+resume_false_interruption=True,
+```
+
+Section 1 sets `allow_interruptions=False`, so it steamrolls you. Turning it
+back on is only half the job — LiveKit's defaults barge in on any 0.5s of sound
+with no word requirement, so a cough or an encouraging "mm-hm" kills the reply.
+
+`min_interruption_words=2` is the one that matters most: it requires two real
+transcribed words before stopping the agent, so backchannels pass through while
+genuine interruptions still land. `min_interruption_duration=0.7` filters
+non-speech noise before STT is even consulted, and
+`discard_audio_if_uninterruptible=False` keeps your audio instead of dropping
+it, so an interrupted question doesn't have to be repeated.
+
+The trade-off to name in class: requiring words means barge-in waits for a
+transcript, so it is slightly slower than the default's instant acoustic
+trigger. You are buying robustness with latency. If an interruption turns out
+to be noise, `resume_false_interruption` restarts the paused reply after two
+seconds rather than leaving the agent stuck mid-sentence — watch for
+`resumed false interrupted speech` in the logs.
+
 **Stop the Section 1 worker first** (`Ctrl+C`). Only one `dev` agent should be running, or both will fight for the same room.
 
 ## A/B turn-taking script (same as Section 1)
