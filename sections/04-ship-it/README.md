@@ -16,21 +16,19 @@ uv run python sections/04-ship-it/agent.py dev
 Connect through the [Agents Playground](https://agents-playground.livekit.io),
 ask two or three HeartByte questions, and read the terminal:
 
-- **`[latency]` prints one latency line per turn.** `perceived` measures from
-  the user's last detected speech to the agent's first server-side audio using
-  LiveKit's `ChatMessage.metrics["e2e_latency"]`. The 800 ms `PASS` / `OVER`
-  target applies only to TTS time-to-first-byte (`tts_ttfb`), not to perceived
-  end-to-end latency. The line also shows EOU, STT finalization,
-  retrieval-hook time, and LLM TTFT.
+- `[latency]` **prints one latency line per turn.** `perceived` measures from the user's last detected speech to the agent's first server-side audio using LiveKit's `ChatMessage.metrics["e2e_latency"]`. The 800 ms `PASS` / `OVER`
+target applies only to TTS time-to-first-byte (`tts_ttfb`), not to perceived
+end-to-end latency. The line also shows EOU, STT finalization,
+retrieval-hook time, and LLM TTFT.
 - **Readable per-turn metrics** print from the `metrics_collected` event: STT,
-  end-of-utterance delay, LLM TTFT (`ttft`), and TTS TTFB (`ttfb`).
-  LiveKit's `metrics.log_metrics()` emits structured fields (often rendered as
-  JSON), which is useful for production ingestion; `_print_metric()` renders
-  the same key values as concise classroom lines.
-- **`[usage] session summary: ...`** logs once on shutdown via
-  `add_shutdown_callback`, from a `metrics.UsageCollector` that accumulated
-  each event. It reports aggregate LLM token totals, STT/TTS audio durations,
-  and TTS character usage for the session.
+end-of-utterance delay, LLM TTFT (`ttft`), and TTS TTFB (`ttfb`).
+LiveKit's `metrics.log_metrics()` emits structured fields (often rendered as
+JSON), which is useful for production ingestion; `_print_metric()` renders
+the same key values as concise classroom lines.
+- `[usage] session summary: ...` logs once on shutdown via
+`add_shutdown_callback`, from a `metrics.UsageCollector` that accumulated
+each event. It reports aggregate LLM token totals, STT/TTS audio durations,
+and TTS character usage for the session.
 
 ```python
 usage_collector = metrics.UsageCollector()
@@ -61,7 +59,7 @@ Example:
 [metrics] EOU  delay=0.62s transcription=0.21s
 [metrics] LLM  ttft=0.44s prompt=580 completion=42 tokens/s=51.3
 [metrics] TTS  ttfb=0.27s audio=4.31s chars=126
-[latency] perceived=1390ms response=COMPLETE | eou=620ms stt_final=210ms retrieval=10ms llm_ttft=440ms tts_ttfb=270ms tts_target=800ms PASS
+[latency] perceived=1390ms response=COMPLETE preemptive=on | eou=620ms stt_final=210ms retrieval=10ms llm_ttft=440ms tts_ttfb=270ms tts_target=800ms PASS
 [usage] session summary: llm_prompt=580 llm_completion=42 stt_audio=2.41s tts_audio=4.31s tts_chars=126
 ```
 
@@ -78,12 +76,17 @@ If the user interrupts after first audio, the end-to-end line is labelled
 `CANCELLED`; interrupted LLM/TTS stage lines use `cancelled=true`. A response
 cancelled before any audio has no first-audio total to report.
 
-This agent carries forward Section 2's tuned interruption settings
-(`min_interruption_words=2` and friends), so `CANCELLED` means a real
-two-word interruption rather than a cough. These values ship with the worker,
-so treat them as production configuration and re-tune them against real visitor
-audio — a noisy phone caller and a headset user do not want the same
-thresholds.
+This agent carries forward Section 2's semantic turn detection, preemptive
+generation, and tuned interruption settings (`min_interruption_words=2` and
+friends), so `CANCELLED` means a real two-word interruption rather than a
+cough. These values ship with the worker, so treat them as production
+configuration and re-tune them against real visitor audio. A noisy phone caller
+and a headset user do not want the same thresholds.
+
+Because every production turn is grounded, LiveKit Agents 1.3.12 invalidates
+speculative output whenever the Moss hook adds context, then regenerates the
+answer from that context. This preserves grounding correctness, although the
+discarded speculative request can consume inference.
 
 Disconnect from the Playground or stop the worker to trigger the shutdown
 callback and print `[usage] session summary: ...`.
@@ -142,7 +145,7 @@ This directory ships as a self-contained deployable Python project so `lk agent 
 
 ## Step 3: Talk to your deployed agent from a local orb page
 
-The Agents Playground is fine for poking the worker, but the course ships a small visitor-facing front end you can run locally to feel what production looks like. It's at the repo root in [`../../orb/`](../../orb/).
+The Agents Playground is fine for poking the worker, but the course ships a small visitor-facing front end you can run locally to feel what production looks like. It's at the repo root in [`orb/`](../../orb/).
 
 ```bash
 cd ../../orb
@@ -153,6 +156,7 @@ Edit `config.js` and fill in two values:
 
 - `URL`: your LiveKit Cloud `wss://...livekit.cloud` (same one in your `.env`)
 - `TOKEN`: a one-hour LiveKit access token for room `heartbyte-orb`:
+
   ```bash
   lk token create --join --room heartbyte-orb --identity orb-visitor --valid-for 1h
   ```
@@ -163,7 +167,7 @@ Then serve the page:
 python3 -m http.server 8000 --bind 127.0.0.1
 ```
 
-Open <http://localhost:8000> → tap the orb → grant the mic → ask "What is HeartByte?" Your browser connects over WebRTC to your LiveKit Cloud project; LiveKit dispatches your deployed worker to the room; the agent does STT → Moss retrieval → LLM → TTS and the reply streams back. The orb's color and state indicator track listening → thinking → speaking. Tap the orb during a live session to disconnect.
+Open [http://localhost:8000](http://localhost:8000) → tap the orb → grant the mic → ask "What is HeartByte?" Your browser connects over WebRTC to your LiveKit Cloud project; LiveKit dispatches your deployed worker to the room; the agent does STT → Moss retrieval → LLM → TTS and the reply streams back. The orb's color and state indicator track listening → thinking → speaking. Tap the orb during a live session to disconnect.
 
 That's the full architecture: static webpage, LiveKit Cloud, and your deployed
 agent meet in the room encoded in the token.

@@ -4,8 +4,8 @@ Section 2: Turn detection that doesn't cut people off.
 Two upgrades over Section 1, one per side of the conversation: LiveKit's
 open-weights end-of-turn model replaces VAD-only silence timeouts, and barge-in
 is switched on and tuned so backchannels do not cut the agent off. Same
-pipeline otherwise. Compare [timing] end-of-utterance delay and TOTAL lines
-against Section 1 on the A/B script.
+pipeline otherwise. Preemptive generation starts inference before the final
+turn boundary so the first audible reply can arrive sooner.
 
 Run:
     uv run python sections/02-production-ux/agent.py dev
@@ -15,6 +15,8 @@ from dotenv import load_dotenv
 from livekit.agents import (
     Agent,
     AgentSession,
+    ChatMessage,
+    ConversationItemAddedEvent,
     JobContext,
     MetricsCollectedEvent,
     WorkerOptions,
@@ -44,22 +46,11 @@ class HelloAgent(Agent):
 
 
 def _attach_timing_logs(session: AgentSession) -> None:
-    """Print turn latency so you can A/B Section 1 vs Section 2 in the terminal."""
-    # Stages of the current turn, held until first audio so we can total them.
-    # Only these three are additive: end-of-utterance delay and transcription
-    # delay are both measured from the moment you stop speaking, so the
-    # transcription wait already sits inside the end-of-utterance delay.
-    turn: dict[str, float] = {}
-
-    def _print_total() -> None:
-        if not {"eou", "llm", "tts"} <= turn.keys():
-            return
-        total_ms = (turn["eou"] + turn["llm"] + turn["tts"]) * 1000
-        print(
-            f"[timing] TOTAL end-to-end:       {total_ms:.0f}ms "
-            f"(speech end → first audio byte)"
-        )
-        turn.clear()
+    """Print component timing and exact perceived latency."""
+    # Once generation is preemptive, EOU, LLM, and TTS work may overlap. Their
+    # individual metrics remain useful diagnostics, but adding them would
+    # overstate what the user waited. ChatMessage.metrics["e2e_latency"] is the
+    # SDK's direct speech-end → first-server-audio measurement.
 
     @session.on("metrics_collected")
     def _on_metrics(ev: MetricsCollectedEvent) -> None:
@@ -67,8 +58,6 @@ def _attach_timing_logs(session: AgentSession) -> None:
         if isinstance(m, EOUMetrics):
             # With MultilingualModel, unfinished transcripts should keep this
             # from firing too early during a mid-thought pause.
-            turn.clear()
-            turn["eou"] = m.end_of_utterance_delay
             print(
                 f"[timing] end-of-utterance delay: {m.end_of_utterance_delay:.2f}s "
                 f"(silence → turn committed)"
@@ -78,15 +67,30 @@ def _attach_timing_logs(session: AgentSession) -> None:
                 f"(speech end → final transcript)"
             )
         elif isinstance(m, LLMMetrics) and not m.cancelled:
-            turn["llm"] = m.ttft
             print(f"[timing] LLM TTFT (first token): {m.ttft:.2f}s")
-            _print_total()
         elif isinstance(m, TTSMetrics) and not m.cancelled:
-            # A reply can arrive as several TTS segments; only the first one
-            # contributes to first-audio latency.
-            turn.setdefault("tts", m.ttfb)
             print(f"[timing] TTS TTFB (first byte):  {m.ttfb:.2f}s")
-            _print_total()
+
+    @session.on("conversation_item_added")
+    def _on_conversation_item_added(ev: ConversationItemAddedEvent) -> None:
+        item = ev.item
+        if not isinstance(item, ChatMessage) or item.role != "assistant":
+            return
+
+        e2e_latency = item.metrics.get("e2e_latency")
+        if e2e_latency is None:
+            return  # initial greeting has no preceding user turn
+
+        llm_ttft = item.metrics.get("llm_node_ttft")
+        tts_ttfb = item.metrics.get("tts_node_ttfb")
+        llm_value = f"{llm_ttft * 1000:.0f}ms" if llm_ttft is not None else "n/a"
+        tts_value = f"{tts_ttfb * 1000:.0f}ms" if tts_ttfb is not None else "n/a"
+        response_status = "CANCELLED" if item.interrupted else "COMPLETE"
+        print(
+            f"[latency] perceived={e2e_latency * 1000:.0f}ms "
+            f"response={response_status} preemptive=on | "
+            f"llm_ttft={llm_value} tts_ttfb={tts_value}"
+        )
 
 
 async def entrypoint(ctx: JobContext) -> None:
@@ -121,7 +125,12 @@ async def entrypoint(ctx: JobContext) -> None:
         # instead of leaving the agent stuck mid-sentence.
         false_interruption_timeout=2.0,
         resume_false_interruption=True,
+        # Start LLM and TTS work when a stable transcript arrives rather than
+        # waiting for the final end-of-turn decision. The SDK cancels stale
+        # speculative work if the transcript changes before the turn commits.
+        preemptive_generation=True,
     )
+    print("[config] preemptive_generation=on")
     _attach_timing_logs(session)
 
     await session.start(agent=HelloAgent(), room=ctx.room)

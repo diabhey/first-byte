@@ -14,8 +14,8 @@ Run (after build_index.py has populated your Moss index):
     uv run python sections/03-grounding-moss/agent.py dev
 
 Then uncomment the hook, restart, and ask HeartByte questions again. The
-[timing] lines add a Moss retrieval stage, so you can watch what grounding
-every turn costs you in the TOTAL.
+[timing] lines add a Moss retrieval stage, and [latency] reports the SDK's
+speech-end to first-audio measurement.
 """
 
 import os
@@ -26,6 +26,7 @@ from livekit.agents import (
     AgentSession,
     ChatContext,
     ChatMessage,
+    ConversationItemAddedEvent,
     JobContext,
     MetricsCollectedEvent,
     WorkerOptions,
@@ -145,31 +146,18 @@ class HeartByteAgent(Agent):
 
 def _attach_timing_logs(session: AgentSession) -> None:
     """Same [timing] lines as Sections 1-2, plus what retrieval costs you."""
-    # Stages of the current turn, held until first audio so we can total them.
-    # Retrieval is its own stage: the end-of-utterance delay is measured when
-    # the turn is committed, before `on_user_turn_completed` runs, so the Moss
-    # query time sits after it rather than inside it. Transcription delay is
-    # the exception — it shares a start point with the end-of-utterance delay
-    # and is already contained in it, so it is never added to the total.
-    turn: dict[str, float] = {}
-
-    def _print_total() -> None:
-        if not {"eou", "retrieval", "llm", "tts"} <= turn.keys():
-            return
-        total_ms = (turn["eou"] + turn["retrieval"] + turn["llm"] + turn["tts"]) * 1000
-        print(
-            f"[timing] TOTAL end-to-end:       {total_ms:.0f}ms "
-            f"(speech end → first audio byte)"
-        )
-        turn.clear()
+    # Preemptive generation allows stages to overlap, so their individual
+    # values are diagnostics rather than numbers to add. Keep the latest Moss
+    # hook duration for the readable per-turn summary and use e2e_latency for
+    # the user's actual wait.
+    latest_retrieval_delay: float | None = None
 
     @session.on("metrics_collected")
     def _on_metrics(ev: MetricsCollectedEvent) -> None:
+        nonlocal latest_retrieval_delay
         m = ev.metrics
         if isinstance(m, EOUMetrics):
-            turn.clear()
-            turn["eou"] = m.end_of_utterance_delay
-            turn["retrieval"] = m.on_user_turn_completed_delay
+            latest_retrieval_delay = m.on_user_turn_completed_delay
             print(
                 f"[timing] end-of-utterance delay: {m.end_of_utterance_delay:.2f}s "
                 f"(silence → turn committed)"
@@ -186,15 +174,38 @@ def _attach_timing_logs(session: AgentSession) -> None:
                 f"(turn committed → context injected)"
             )
         elif isinstance(m, LLMMetrics) and not m.cancelled:
-            turn["llm"] = m.ttft
             print(f"[timing] LLM TTFT (first token): {m.ttft:.2f}s")
-            _print_total()
         elif isinstance(m, TTSMetrics) and not m.cancelled:
-            # A reply can arrive as several TTS segments; only the first one
-            # contributes to first-audio latency.
-            turn.setdefault("tts", m.ttfb)
             print(f"[timing] TTS TTFB (first byte):  {m.ttfb:.2f}s")
-            _print_total()
+
+    @session.on("conversation_item_added")
+    def _on_conversation_item_added(ev: ConversationItemAddedEvent) -> None:
+        nonlocal latest_retrieval_delay
+        item = ev.item
+        if not isinstance(item, ChatMessage) or item.role != "assistant":
+            return
+
+        e2e_latency = item.metrics.get("e2e_latency")
+        if e2e_latency is None:
+            return  # initial greeting has no preceding user turn
+
+        retrieval_value = (
+            f"{latest_retrieval_delay * 1000:.0f}ms"
+            if latest_retrieval_delay is not None
+            else "n/a"
+        )
+        llm_ttft = item.metrics.get("llm_node_ttft")
+        tts_ttfb = item.metrics.get("tts_node_ttfb")
+        llm_value = f"{llm_ttft * 1000:.0f}ms" if llm_ttft is not None else "n/a"
+        tts_value = f"{tts_ttfb * 1000:.0f}ms" if tts_ttfb is not None else "n/a"
+        response_status = "CANCELLED" if item.interrupted else "COMPLETE"
+        print(
+            f"[latency] perceived={e2e_latency * 1000:.0f}ms "
+            f"response={response_status} preemptive=on | "
+            f"retrieval={retrieval_value} llm_ttft={llm_value} "
+            f"tts_ttfb={tts_value}"
+        )
+        latest_retrieval_delay = None
 
 
 async def entrypoint(ctx: JobContext) -> None:
@@ -225,7 +236,12 @@ async def entrypoint(ctx: JobContext) -> None:
         min_interruption_words=2,
         false_interruption_timeout=2.0,
         resume_false_interruption=True,
+        # Carry Section 2's latency optimization forward. When the grounding
+        # hook injects Moss context, LiveKit 1.3.12 safely discards any
+        # speculative ungrounded generation and regenerates with that context.
+        preemptive_generation=True,
     )
+    print("[config] preemptive_generation=on")
     _attach_timing_logs(session)
 
     await session.start(agent=HeartByteAgent(moss, index_name), room=ctx.room)

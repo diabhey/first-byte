@@ -26,10 +26,10 @@ uv run python sections/03-grounding-moss/build_index.py --replace
 start with `firstbyte-`, the script asks you to retype the name first, so a
 stray `--replace` cannot quietly destroy a real index in your Moss project.
 
-This agent keeps everything Section 2 established — semantic turn detection and
-the tuned interruption settings (`min_interruption_words=2` and friends) — and
-adds retrieval on top. Barge-in still works mid-answer, and backchannels still
-don't cut the agent off.
+This agent keeps everything Section 2 established: semantic turn detection,
+preemptive generation, and the tuned interruption settings
+(`min_interruption_words=2` and friends). It adds retrieval on top. Barge-in
+still works mid-answer, and backchannels still don't cut the agent off.
 
 The script calls `client.create_index(name, docs, model_id="moss-minilm")`. The `model_id` argument selects the embedding model and is required by the Moss SDK. `moss-minilm` is the standard choice and what we use throughout this course. If you fork this script and drop the kwarg, the call will fail at runtime with a missing-argument error, not a typo: this is the most common gotcha students hit when they start tweaking.
 
@@ -56,11 +56,11 @@ Open [`agent.py`](./agent.py). Moss client + index pre-load are already wired. T
 
 1. Run **without** the hook first (ungrounded baseline):
 
-```bash
-uv run python sections/03-grounding-moss/agent.py dev
-```
+   ```bash
+   uv run python sections/03-grounding-moss/agent.py dev
+   ```
 
-Ask a HeartByte question in the [Agents Playground](https://agents-playground.livekit.io). The agent should say it does not have the information — the behaviour prompt is active, but no KB context has been injected yet.
+   Ask a HeartByte question in the [Agents Playground](https://agents-playground.livekit.io). The agent should say it does not have the information — the behaviour prompt is active, but no KB context has been injected yet.
 
 2. Stop the worker with `Ctrl+C`. Select the complete commented
    `on_user_turn_completed` block and toggle comments:
@@ -70,13 +70,13 @@ Ask a HeartByte question in the [Agents Playground](https://agents-playground.li
 
 3. Restart the worker with the same command, reconnect, and ask again:
 
-- "What is HeartByte?"
-- "Tell me about Abhi's three-phase method."
-- "What's Abhi's background?"
-- "How do I get in touch?"
-- "What's the orb itself built on?"
+   - "What is HeartByte?"
+   - "Tell me about Abhi's three-phase method."
+   - "What's Abhi's background?"
+   - "How do I get in touch?"
+   - "What's the orb itself built on?"
 
-Watch the terminal for `[moss] injected N results`. Each user turn now queries Moss before the LLM sees anything.
+   Watch the terminal for `[moss] injected N results`. Each user turn now queries Moss before the LLM sees anything.
 
 ### Expected before/after
 
@@ -95,14 +95,22 @@ stage those sections do not have:
 [timing] Moss retrieval:         0.14s (turn committed → context injected)
 [timing] LLM TTFT (first token): 0.61s
 [timing] TTS TTFB (first byte):  0.33s
-[timing] TOTAL end-to-end:       1630ms (speech end → first audio byte)
+[latency] perceived=1540ms response=COMPLETE preemptive=on | retrieval=140ms llm_ttft=610ms tts_ttfb=330ms
 ```
 
 `Moss retrieval` is near `0.00s` while the hook is commented out, and shows the
-real query cost once you enable it. Compare `TOTAL` before and after: that
-difference is exactly what grounding every turn costs your users in perceived
-latency, and it is the reason this course runs retrieval in-process instead of
-against a hosted vector database.
+real query cost once you enable it. Compare the separately measured
+`perceived` value before and after. Do not add the component values: STT,
+end-of-turn detection, LLM, and TTS can overlap once preemptive generation is
+enabled.
+
+There is one important correctness rule in LiveKit Agents 1.3.12. A grounded
+turn changes the temporary chat context inside `on_user_turn_completed`, so
+LiveKit discards any speculative ungrounded answer and regenerates using the
+Moss context. Preemptive generation can reduce latency on turns where the
+context does not change; it never bypasses the grounding hook. The discarded
+speculation may still consume inference, which is part of the trade-off to
+measure.
 
 Index pre-loading alone does not ground an answer. The hook must perform
 `query()` and inject the returned documents into `turn_ctx`.
@@ -149,4 +157,6 @@ Four things to internalize:
 - `on_user_turn_completed` override for unconditional RAG
 - `MossClient.query` with `QueryOptions(top_k, alpha)`
 - `ChatContext.add_message(role="system", content=...)` for context injection
+- `preemptive_generation=True`, carried forward from Section 2 with automatic
+  invalidation whenever grounding changes the temporary chat context
 - The principle: **retrieve always, let the LLM decide what to use**

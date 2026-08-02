@@ -10,7 +10,16 @@ Fix the one thing every voice demo gets wrong: the agent talking over you when y
 uv run python sections/02-production-ux/agent.py dev
 ```
 
-Same `[timing]` logs as Section 1 — compare `end-of-utterance delay` on the A/B phrases.
+Preemptive generation is enabled in this section. It starts LLM and
+TTS work as soon as a stable transcript arrives, before the semantic
+end-of-turn decision is final. If the transcript changes, LiveKit cancels the
+speculative response and starts again with the completed turn.
+
+Compare the `[latency] perceived=...` values with your Section 1 measurements,
+using the same words, microphone, room, and pause length. That value is
+LiveKit's direct measurement from the user's last detected speech to the first
+server-side audio. Collect at least five complete turns and compare the median
+rather than a single turn.
 
 ## What changed from Section 1
 
@@ -65,7 +74,7 @@ seconds rather than leaving the agent stuck mid-sentence — watch for
 Reconnect in the Playground, then repeat the **exact** script and **2 second** pauses from [`../01-hello-voice/README.md`](../01-hello-voice/README.md). Compare your notes.
 
 | # | Say this | Pause | Then | What to watch (Section 2) |
-|---|----------|-------|------|---------------------------|
+| --- | -------- | ----- | ---- | ------------------------- |
 | 1 | `What's two plus two?` | — | wait for reply | Control — should feel similar to Section 1. |
 | 2 | `Hmm, the thing I want to ask is` | **2 seconds** (do not continue) | wait | Should **wait**, not invent a reply mid-thought. |
 | 3 | `So my real question is` | **2 seconds** | `how does voice activity detection work?` | Should let you finish after the pause. |
@@ -80,24 +89,30 @@ Reconnect in the Playground, then repeat the **exact** script and **2 second** p
 Example terminal output after a turn:
 
 ```text
+[config] preemptive_generation=on
 [timing] end-of-utterance delay: 0.84s (silence → turn committed)
 [timing] transcription delay:    0.31s (speech end → final transcript)
 [timing] LLM TTFT (first token): 0.22s
 [timing] TTS TTFB (first byte):  0.18s
-[timing] TOTAL end-to-end:       1240ms (speech end → first audio byte)
+[latency] perceived=920ms response=COMPLETE preemptive=on | llm_ttft=220ms tts_ttfb=180ms
 ```
 
-`TOTAL` is what the user actually feels: the wait between their last word and
-your first audio. It sums end-of-utterance delay, LLM TTFT, and TTS TTFB.
-Transcription delay is deliberately **not** added, because it is measured from
-the same instant as the end-of-utterance delay and is already contained inside
-it — adding both would double-count the same waiting. Compare `TOTAL` against
-Section 1 alongside the EOU delay; the 800 ms course target applies to TTS TTFB
-only, not to this number.
+The `[latency] perceived` value is what the user actually feels: the wait
+between their last detected speech and the first server-side audio. Do not add
+EOU, LLM TTFT, and TTS TTFB when preemptive generation is enabled because those
+stages can overlap. The example values above illustrate the log shape; use your
+own A/B measurements to evaluate the change.
+
+The trade-off: preemptive generation can reduce silence, but it spends extra
+inference when the user pauses, revises a sentence, or continues speaking after
+an interim transcript. Judge it on both latency and behavior: the optimized
+agent must still wait through unfinished thoughts.
 
 ## Concepts introduced
 
 - `MultilingualModel` from `livekit-plugins-turn-detector`
+- `preemptive_generation`: overlap model inference with turn detection, then
+  cancel speculative work if the transcript changes
 - The semantic end-of-turn principle: stop guessing from acoustic silence, listen to what was said
 - Interruption tuning: `allow_interruptions`, `min_interruption_duration`,
   `min_interruption_words`, and false-interruption recovery

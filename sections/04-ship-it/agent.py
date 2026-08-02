@@ -206,7 +206,8 @@ def _print_turn_latency(turn: TurnLatency) -> bool:
     llm_ttft = f"{turn.llm_ttft * 1000:.0f}ms" if turn.llm_ttft is not None else "n/a"
     tts_ttfb = f"{turn.tts_ttfb * 1000:.0f}ms" if turn.tts_ttfb is not None else "n/a"
     print(
-        f"[latency] perceived={perceived_ms}ms response={response_status} | "
+        f"[latency] perceived={perceived_ms}ms response={response_status} "
+        f"preemptive=on | "
         f"eou={turn.eou_delay * 1000:.0f}ms "
         f"stt_final={turn.transcription_delay * 1000:.0f}ms "
         f"retrieval={turn.retrieval_delay * 1000:.0f}ms "
@@ -247,7 +248,12 @@ async def entrypoint(ctx: JobContext) -> None:
         min_interruption_words=2,
         false_interruption_timeout=2.0,
         resume_false_interruption=True,
+        # Carry Section 2's latency optimization into the deployed worker.
+        # Grounded turns remain correct: LiveKit invalidates speculative output
+        # whenever on_user_turn_completed changes the temporary chat context.
+        preemptive_generation=True,
     )
+    print("[config] preemptive_generation=on")
 
     # Production observability: inspect per-stage latency on every turn, then
     # print aggregate model usage when the session shuts down.
