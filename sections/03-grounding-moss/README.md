@@ -26,6 +26,11 @@ uv run python sections/03-grounding-moss/build_index.py --replace
 start with `firstbyte-`, the script asks you to retype the name first, so a
 stray `--replace` cannot quietly destroy a real index in your Moss project.
 
+This agent keeps everything Section 2 established — semantic turn detection and
+the tuned interruption settings (`min_interruption_words=2` and friends) — and
+adds retrieval on top. Barge-in still works mid-answer, and backchannels still
+don't cut the agent off.
+
 The script calls `client.create_index(name, docs, model_id="moss-minilm")`. The `model_id` argument selects the embedding model and is required by the Moss SDK. `moss-minilm` is the standard choice and what we use throughout this course. If you fork this script and drop the kwarg, the call will fail at runtime with a missing-argument error, not a typo: this is the most common gotcha students hit when they start tweaking.
 
 ## Step 2: Inspect the index from the CLI (Exercise 5)

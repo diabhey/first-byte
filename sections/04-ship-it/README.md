@@ -78,6 +78,13 @@ If the user interrupts after first audio, the end-to-end line is labelled
 `CANCELLED`; interrupted LLM/TTS stage lines use `cancelled=true`. A response
 cancelled before any audio has no first-audio total to report.
 
+This agent carries forward Section 2's tuned interruption settings
+(`min_interruption_words=2` and friends), so `CANCELLED` means a real
+two-word interruption rather than a cough. These values ship with the worker,
+so treat them as production configuration and re-tune them against real visitor
+audio — a noisy phone caller and a headset user do not want the same
+thresholds.
+
 Disconnect from the Playground or stop the worker to trigger the shutdown
 callback and print `[usage] session summary: ...`.
 

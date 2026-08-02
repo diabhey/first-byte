@@ -14,7 +14,9 @@ Same `[timing]` logs as Section 1 — compare `end-of-utterance delay` on the A/
 
 ## What changed from Section 1
 
-One line:
+Two things, aimed at the two halves of a conversation.
+
+**1. When *you* are finished — semantic turn detection:**
 
 ```python
 turn_detection=MultilingualModel(),
@@ -35,7 +37,8 @@ Reconnect in the Playground, then repeat the **exact** script and **2 second** p
 | 3 | `So my real question is` | **2 seconds** | `how does voice activity detection work?` | Should let you finish after the pause. |
 | 4 | `What's the weather` | **2 seconds** | `in Lisbon?` | Should not answer until after "Lisbon". |
 | 5 | `I was wondering` | **2 seconds** | `whether you can hear me clearly.` | Should hold through the gap. |
-| 6 | Speak over the agent mid-reply | — | — | Barge-in still stops the agent (same as Section 1). |
+| 6 | Speak over the agent mid-reply with a full sentence | — | — | Agent stops and listens. Section 1 ignored you completely. |
+| 6b | Say just `mm-hm` or `yeah` while the agent talks | — | — | Agent keeps going — under the 2-word threshold, so backchannels don't cut it off. |
 | 7 | Stay silent after a full reply | 30 seconds | — | Still quiet — turn detection doesn't make it chatty. |
 
 **How to score:** for #2–#5, count how often Section 1 **jumped in** vs Section 2 **waited**, and compare `[timing] end-of-utterance delay` in the terminal. That delta is the lesson: silence ≠ end of turn. If both waited, lengthen the pause to ~3 seconds and retry #2 and #4 — short pauses often look the same on both agents.
@@ -62,6 +65,10 @@ only, not to this number.
 
 - `MultilingualModel` from `livekit-plugins-turn-detector`
 - The semantic end-of-turn principle: stop guessing from acoustic silence, listen to what was said
+- Interruption tuning: `allow_interruptions`, `min_interruption_duration`,
+  `min_interruption_words`, and false-interruption recovery
+- Turn detection and interruption are independent systems — one decides when
+  the user is done, the other when the agent must stop
 
 ## What this section deliberately doesn't cover
 

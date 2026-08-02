@@ -99,6 +99,14 @@ async def entrypoint(ctx: JobContext) -> None:
         llm="openai/gpt-4o-mini",
         tts="cartesia/sonic-3",
         vad=silero.VAD.load(),
+        # Deliberately broken baseline. Talk over the agent and it keeps going
+        # to the end of its reply, because nothing is listening for barge-in.
+        # LiveKit's default is True; Section 2 turns it back on and tunes it.
+        allow_interruptions=False,
+        # The other half of the problem: while the agent is speaking and cannot
+        # be interrupted, your audio is thrown away rather than buffered. So
+        # the agent does not just talk over you, it never hears what you said.
+        discard_audio_if_uninterruptible=True,
     )
     _attach_timing_logs(session)
 

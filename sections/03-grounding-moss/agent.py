@@ -201,6 +201,14 @@ async def entrypoint(ctx: JobContext) -> None:
         tts="cartesia/sonic-3",
         vad=silero.VAD.load(min_silence_duration=0.25),
         turn_detection=MultilingualModel(),
+        # Interruption settings carried forward from Section 2. Barge-in on,
+        # but a cough or an "mm-hm" must not cut the agent off mid-answer.
+        allow_interruptions=True,
+        discard_audio_if_uninterruptible=False,
+        min_interruption_duration=0.7,
+        min_interruption_words=2,
+        false_interruption_timeout=2.0,
+        resume_false_interruption=True,
     )
     _attach_timing_logs(session)
 

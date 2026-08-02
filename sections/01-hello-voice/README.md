@@ -45,6 +45,21 @@ You speak  →  Silero VAD detects start of speech
 
 The `vad=silero.VAD.load()` line is the only thing not routed through Inference. VAD runs locally in your worker process for latency reasons.
 
+## What's deliberately broken here
+
+This agent sets `allow_interruptions=False`, so talking over it does nothing —
+it finishes its reply no matter what. LiveKit's default is `True`; we switch it
+off to give Section 2 something to fix.
+
+`discard_audio_if_uninterruptible=True` (the default) makes it worse in a way
+worth feeling: while the agent is speaking and cannot be interrupted, your audio
+is dropped rather than buffered. So the agent doesn't just talk over you, it
+never hears what you said, and you have to repeat yourself once it stops.
+
+Interruption and turn detection are separate systems, which is easy to conflate.
+Interruption decides when to stop the **agent**; turn detection decides when
+**you** are finished. Section 2 improves both.
+
 ## A/B turn-taking script (run this first)
 
 Run **only this agent**. Use headphones. In the Playground, connect, then work the script top to bottom. For each line: speak exactly as written, hold the pause silently (count in your head), then either finish the sentence or wait to see if the agent jumps in. Note whether the agent **replied during the pause** (too early) or **waited**.
@@ -56,7 +71,7 @@ Run **only this agent**. Use headphones. In the Playground, connect, then work t
 | 3 | `So my real question is` | **2 seconds** | `how does voice activity detection work?` | May cut in during the pause before you finish. |
 | 4 | `What's the weather` | **2 seconds** | `in Lisbon?` | May answer after "weather" before "Lisbon". |
 | 5 | `I was wondering` | **2 seconds** | `whether you can hear me clearly.` | Same: premature reply during the gap. |
-| 6 | Speak over the agent mid-reply on any answer | — | — | Agent should stop and listen (barge-in). That's expected. |
+| 6 | Speak over the agent mid-reply on any answer | — | — | Agent talks straight through you and never heard a word of it. `allow_interruptions=False` here — Section 2 fixes it. |
 | 7 | Stay silent after a full reply | 30 seconds | — | Agent should not keep talking unprompted. |
 
 Write down for #2–#5: **jumped in** / **waited**, plus the terminal's `[timing] end-of-utterance delay` value when a reply does fire. That number is how long after you stopped speaking before the turn was committed — on premature replies it often lands near your pause length.
