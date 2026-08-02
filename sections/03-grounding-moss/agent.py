@@ -13,7 +13,9 @@ let the LLM decide what to use.
 Run (after build_index.py has populated your Moss index):
     uv run python sections/03-grounding-moss/agent.py dev
 
-Then uncomment the hook, restart, and ask HeartByte questions again.
+Then uncomment the hook, restart, and ask HeartByte questions again. The
+[timing] lines add a Moss retrieval stage, so you can watch what grounding
+every turn costs you in the TOTAL.
 """
 
 import os
@@ -25,9 +27,11 @@ from livekit.agents import (
     ChatContext,
     ChatMessage,
     JobContext,
+    MetricsCollectedEvent,
     WorkerOptions,
     cli,
 )
+from livekit.agents.metrics import EOUMetrics, LLMMetrics, TTSMetrics
 from livekit.plugins import silero
 from livekit.plugins.turn_detector.multilingual import MultilingualModel
 from moss import MossClient, QueryOptions
@@ -123,6 +127,60 @@ class HeartByteAgent(Agent):
     #     return await super().on_user_turn_completed(turn_ctx, new_message)
 
 
+def _attach_timing_logs(session: AgentSession) -> None:
+    """Same [timing] lines as Sections 1-2, plus what retrieval costs you."""
+    # Stages of the current turn, held until first audio so we can total them.
+    # Retrieval is its own stage: the end-of-utterance delay is measured when
+    # the turn is committed, before `on_user_turn_completed` runs, so the Moss
+    # query time sits after it rather than inside it. Transcription delay is
+    # the exception — it shares a start point with the end-of-utterance delay
+    # and is already contained in it, so it is never added to the total.
+    turn: dict[str, float] = {}
+
+    def _print_total() -> None:
+        if not {"eou", "retrieval", "llm", "tts"} <= turn.keys():
+            return
+        total_ms = (turn["eou"] + turn["retrieval"] + turn["llm"] + turn["tts"]) * 1000
+        print(
+            f"[timing] TOTAL end-to-end:       {total_ms:.0f}ms "
+            f"(speech end → first audio byte)"
+        )
+        turn.clear()
+
+    @session.on("metrics_collected")
+    def _on_metrics(ev: MetricsCollectedEvent) -> None:
+        m = ev.metrics
+        if isinstance(m, EOUMetrics):
+            turn.clear()
+            turn["eou"] = m.end_of_utterance_delay
+            turn["retrieval"] = m.on_user_turn_completed_delay
+            print(
+                f"[timing] end-of-utterance delay: {m.end_of_utterance_delay:.2f}s "
+                f"(silence → turn committed)"
+            )
+            print(
+                f"[timing] transcription delay:    {m.transcription_delay:.2f}s "
+                f"(speech end → final transcript)"
+            )
+            # Near zero until Exercise 6 is uncommented; this is the price of
+            # grounding every turn.
+            print(
+                f"[timing] Moss retrieval:         "
+                f"{m.on_user_turn_completed_delay:.2f}s "
+                f"(turn committed → context injected)"
+            )
+        elif isinstance(m, LLMMetrics) and not m.cancelled:
+            turn["llm"] = m.ttft
+            print(f"[timing] LLM TTFT (first token): {m.ttft:.2f}s")
+            _print_total()
+        elif isinstance(m, TTSMetrics) and not m.cancelled:
+            # A reply can arrive as several TTS segments; only the first one
+            # contributes to first-audio latency.
+            turn.setdefault("tts", m.ttfb)
+            print(f"[timing] TTS TTFB (first byte):  {m.ttfb:.2f}s")
+            _print_total()
+
+
 async def entrypoint(ctx: JobContext) -> None:
     await ctx.connect()
 
@@ -144,6 +202,7 @@ async def entrypoint(ctx: JobContext) -> None:
         vad=silero.VAD.load(min_silence_duration=0.25),
         turn_detection=MultilingualModel(),
     )
+    _attach_timing_logs(session)
 
     await session.start(agent=HeartByteAgent(moss, index_name), room=ctx.room)
 

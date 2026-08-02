@@ -10,7 +10,28 @@ Boot a voice agent in under 60 seconds and have your first conversation.
 uv run python sections/01-hello-voice/agent.py dev
 ```
 
-Open [agents-playground.livekit.io](https://agents-playground.livekit.io) in another tab. Connect to your local agent. Talk to it. Keep the terminal visible — after each turn it prints `[timing]` lines (end-of-utterance delay, LLM TTFT, TTS first audio byte).
+Open [agents-playground.livekit.io](https://agents-playground.livekit.io) in another tab. Connect to your local agent. Talk to it. Keep the terminal visible — after each turn it prints `[timing]` lines followed by a `TOTAL` in milliseconds:
+
+```text
+[timing] end-of-utterance delay: 0.55s (silence → turn committed)
+[timing] transcription delay:    0.29s (speech end → final transcript)
+[timing] LLM TTFT (first token): 0.61s
+[timing] TTS TTFB (first byte):  0.33s
+[timing] TOTAL end-to-end:       1490ms (speech end → first audio byte)
+```
+
+**TTFT** is time-to-first-token: how long the LLM takes to emit its first token,
+not to finish the sentence. **TTFB** is time-to-first-byte: how long the TTS
+takes to return its first chunk of audio, not to synthesize the whole reply.
+Both measure when output *starts*, because in voice that is the moment the user
+stops waiting. TTS TTFB is the metric this course is named after and the one the
+800 ms target applies to.
+
+`TOTAL` is the perceived wait from your last word to the agent's first audio. It
+adds up the end-of-utterance delay, LLM TTFT, and TTS TTFB. Transcription delay
+is not added: it starts from the same instant as the end-of-utterance delay and
+already sits inside it, so counting both would double-count the same wait. The
+greeting has no `TOTAL` because no user turn preceded it.
 
 ## What's happening under the hood
 
@@ -30,7 +51,7 @@ Run **only this agent**. Use headphones. In the Playground, connect, then work t
 
 | # | Say this | Pause | Then | What to watch (Section 1) |
 |---|----------|-------|------|---------------------------|
-| 1 | `What's two plus two?` | — | wait for reply | Control. Observe last word → first audio; this includes more than TTS TTFB, so do not compare it with the course's 800 ms TTS target. |
+| 1 | `What's two plus two?` | — | wait for reply | Control. The `TOTAL` line is that last word → first audio wait; it includes far more than TTS TTFB, so do not compare it with the course's 800 ms TTS target. |
 | 2 | `Hmm, the thing I want to ask is` | **2 seconds** (do not continue) | wait | Often jumps in mid-thought — silence looked like end of turn. |
 | 3 | `So my real question is` | **2 seconds** | `how does voice activity detection work?` | May cut in during the pause before you finish. |
 | 4 | `What's the weather` | **2 seconds** | `in Lisbon?` | May answer after "weather" before "Lisbon". |

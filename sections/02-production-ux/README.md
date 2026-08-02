@@ -45,9 +45,18 @@ Example terminal output after a turn:
 ```text
 [timing] end-of-utterance delay: 0.84s (silence → turn committed)
 [timing] transcription delay:    0.31s (speech end → final transcript)
-[timing] LLM time-to-first-token: 0.22s
-[timing] TTS first audio byte:    0.18s
+[timing] LLM TTFT (first token): 0.22s
+[timing] TTS TTFB (first byte):  0.18s
+[timing] TOTAL end-to-end:       1240ms (speech end → first audio byte)
 ```
+
+`TOTAL` is what the user actually feels: the wait between their last word and
+your first audio. It sums end-of-utterance delay, LLM TTFT, and TTS TTFB.
+Transcription delay is deliberately **not** added, because it is measured from
+the same instant as the end-of-utterance delay and is already contained inside
+it — adding both would double-count the same waiting. Compare `TOTAL` against
+Section 1 alongside the EOU delay; the 800 ms course target applies to TTS TTFB
+only, not to this number.
 
 ## Concepts introduced
 

@@ -81,6 +81,24 @@ Ask **"Who's Abhi?"** both times:
 - **Hook enabled:** the terminal prints `[moss] injected 5 results`, and the
   agent answers from the shipped HeartByte knowledge base.
 
+This section prints the same `[timing]` lines as Sections 1 and 2, plus the one
+stage those sections do not have:
+
+```text
+[timing] end-of-utterance delay: 0.55s (silence → turn committed)
+[timing] transcription delay:    0.29s (speech end → final transcript)
+[timing] Moss retrieval:         0.14s (turn committed → context injected)
+[timing] LLM TTFT (first token): 0.61s
+[timing] TTS TTFB (first byte):  0.33s
+[timing] TOTAL end-to-end:       1630ms (speech end → first audio byte)
+```
+
+`Moss retrieval` is near `0.00s` while the hook is commented out, and shows the
+real query cost once you enable it. Compare `TOTAL` before and after: that
+difference is exactly what grounding every turn costs your users in perceived
+latency, and it is the reason this course runs retrieval in-process instead of
+against a hosted vector database.
+
 Index pre-loading alone does not ground an answer. The hook must perform
 `query()` and inject the returned documents into `turn_ctx`.
 

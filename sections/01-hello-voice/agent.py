@@ -45,6 +45,21 @@ class HelloAgent(Agent):
 
 def _attach_timing_logs(session: AgentSession) -> None:
     """Print turn latency so you can A/B Section 1 vs Section 2 in the terminal."""
+    # Stages of the current turn, held until first audio so we can total them.
+    # Only these three are additive: end-of-utterance delay and transcription
+    # delay are both measured from the moment you stop speaking, so the
+    # transcription wait already sits inside the end-of-utterance delay.
+    turn: dict[str, float] = {}
+
+    def _print_total() -> None:
+        if not {"eou", "llm", "tts"} <= turn.keys():
+            return
+        total_ms = (turn["eou"] + turn["llm"] + turn["tts"]) * 1000
+        print(
+            f"[timing] TOTAL end-to-end:       {total_ms:.0f}ms "
+            f"(speech end → first audio byte)"
+        )
+        turn.clear()
 
     @session.on("metrics_collected")
     def _on_metrics(ev: MetricsCollectedEvent) -> None:
@@ -53,6 +68,8 @@ def _attach_timing_logs(session: AgentSession) -> None:
             # How long after you stopped speaking before the turn was committed.
             # On unfinished phrases with a long pause, Section 1 is often large
             # here because silence alone ended the turn.
+            turn.clear()
+            turn["eou"] = m.end_of_utterance_delay
             print(
                 f"[timing] end-of-utterance delay: {m.end_of_utterance_delay:.2f}s "
                 f"(silence → turn committed)"
@@ -62,10 +79,16 @@ def _attach_timing_logs(session: AgentSession) -> None:
                 f"(speech end → final transcript)"
             )
         elif isinstance(m, LLMMetrics) and not m.cancelled:
-            print(f"[timing] LLM time-to-first-token: {m.ttft:.2f}s")
+            turn["llm"] = m.ttft
+            print(f"[timing] LLM TTFT (first token): {m.ttft:.2f}s")
+            _print_total()
         elif isinstance(m, TTSMetrics) and not m.cancelled:
             # Course namesake metric: delay inside TTS until first audio chunk.
-            print(f"[timing] TTS first audio byte:    {m.ttfb:.2f}s")
+            # A reply can arrive as several TTS segments; only the first one
+            # contributes to first-audio latency.
+            turn.setdefault("tts", m.ttfb)
+            print(f"[timing] TTS TTFB (first byte):  {m.ttfb:.2f}s")
+            _print_total()
 
 
 async def entrypoint(ctx: JobContext) -> None:

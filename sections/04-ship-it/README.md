@@ -23,7 +23,7 @@ ask two or three HeartByte questions, and read the terminal:
   end-to-end latency. The line also shows EOU, STT finalization,
   retrieval-hook time, and LLM TTFT.
 - **Readable per-turn metrics** print from the `metrics_collected` event: STT,
-  end-of-utterance delay, LLM time-to-first-token, and TTS first audio byte.
+  end-of-utterance delay, LLM TTFT (`ttft`), and TTS TTFB (`ttfb`).
   LiveKit's `metrics.log_metrics()` emits structured fields (often rendered as
   JSON), which is useful for production ingestion; `_print_metric()` renders
   the same key values as concise classroom lines.
