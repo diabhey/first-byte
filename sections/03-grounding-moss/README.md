@@ -1,4 +1,6 @@
-# Section 3: Grounding with Moss
+# Course Section 4: Grounding with Moss
+
+Directory 3 of 4: `03-grounding-moss`.
 
 ## Goal
 
@@ -49,16 +51,16 @@ Moss setup and index preloading already exist in [`agent.py`](./agent.py). The `
 1. Run the ungrounded baseline:
 
    ```bash
-   uv run python sections/03-grounding-moss/agent.py dev
+   lk agent dev sections/03-grounding-moss/agent.py
    ```
 
-2. Ask “Who’s Abhi?” The agent has no injected knowledge-base context, so it should say it does not have that information.
+2. Open the CLI’s Agent Console link, select the exact printed `dev-...` deployment, and ask “Who’s Abhi?” The agent has no injected knowledge-base context, so it should say it does not have that information.
 3. Stop the worker. Uncomment the complete `on_user_turn_completed` block (`Cmd + /` on macOS; `Ctrl + /` elsewhere).
-4. Restart, ask the same question, and watch for `[moss] injected N results`.
+4. Restart, select the newly printed development deployment in Agent Console, ask the same question, and watch for `[moss] injected N results`.
 
 ```text
-[timing] Moss retrieval: ...
-[latency] perceived=...ms ... retrieval=...ms
+[timing] Moss retrieval hook: ...
+[latency] server_e2e=...ms response=COMPLETE preemptive=on | ...
 ```
 
 > **Important:** index preloading does not ground an answer. The hook must query Moss and add its results to the temporary `turn_ctx`.
@@ -78,7 +80,7 @@ The prompt treats retrieved content as reference data, not instructions. Includi
 
 This section carries forward semantic turn detection, barge-in tuning, and preemptive generation.
 
-- Component timings may overlap; compare the separately measured `perceived` latency before and after grounding.
+- Component timings may overlap; compare the separately measured `server_e2e` latency (network and playback excluded) before and after grounding.
 - Changing `turn_ctx` with the retrieval results invalidates speculative ungrounded output, so LiveKit regenerates the answer with the context. That preserves grounding but may spend extra inference.
 
 ## Concepts

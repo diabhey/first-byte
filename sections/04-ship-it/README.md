@@ -1,4 +1,6 @@
-# Section 4: Ship it
+# Course Section 5: Ship it
+
+Directory 4 of 4: `04-ship-it`.
 
 ## Goal
 
@@ -6,38 +8,42 @@
 
 ## 1. Observe a real session
 
-Complete the [root setup and pre-flight check](../../README.md#pre-class-setup), and build the Moss index in [Section 3](../03-grounding-moss/README.md), before running this worker.
+Complete the [root setup and pre-flight check](../../README.md#pre-class-setup), and build the Moss index in [course Section 4](../03-grounding-moss/README.md), before running this worker.
 
 Stop any earlier worker and run:
 
 ```bash
-uv run python sections/04-ship-it/agent.py dev
+lk agent dev sections/04-ship-it/agent.py
 ```
 
-Connect through [Agents Playground](https://agents-playground.livekit.io), ask two or three HeartByte questions, then inspect the terminal.
+Open the CLI’s Agent Console link, or launch [Agent Console](https://docs.livekit.io/testing/agent-console/) from the same project’s dashboard. Select the exact `dev-...` deployment printed by this worker, ask two or three HeartByte questions, then inspect the terminal. The default production target does not route to this dev worker.
 
 ```text
-[metrics] STT  audio=...
-[metrics] EOU  delay=... transcription=...
-[metrics] LLM  ttft=... prompt=... completion=...
-[metrics] TTS  ttfb=... audio=... chars=...
-[latency] perceived=... response=COMPLETE preemptive=on | ...
-[usage]   session summary: ...
+[metrics] EOU  delay=...
+[metrics] STT  final_transcript=...
+[metrics] RAG  hook=...
+[metrics] LLM  ttft=...
+[metrics] TTS  ttfb=...
+[latency] server_e2e=... response=COMPLETE preemptive=on
+[usage] cumulative: ...
+[usage] session summary: ...
 ```
 
 ## Key takeaway
 >
-> “Observability comes before deployment. `perceived` tells us the user’s wait; the individual stages tell us where that wait came from.”
+> “Observability comes before deployment. `server_e2e` measures the server portion of the wait; the individual stages tell us where that wait came from.”
 
-- **`perceived`** is LiveKit’s speech-end → first-server-audio measurement.
+- **`server_e2e`** is LiveKit’s speech-end → first-server-audio measurement from `ChatMessage.metrics["e2e_latency"]`. It excludes network delivery and browser playback.
 - **EOU, STT, retrieval, LLM TTFT, and TTS TTFB** diagnose the stages behind it.
 - Do **not** add the stage durations: they can overlap.
-- `[usage]` is emitted on disconnect or shutdown. It rolls up LLM tokens, STT/TTS audio duration, and TTS characters with `metrics.UsageCollector`.
+- `[usage] cumulative` prints on `session_usage_updated`: each event is an updated total, so do not add snapshots together. The shutdown callback prints the final `session.usage` summary with LLM tokens, STT/TTS audio duration, and TTS characters.
 - An interrupted answer is marked `CANCELLED`; an answer cancelled before first audio has no first-audio latency.
 
 > **Important:** this is a breakdown, not a pass/fail score. Compare repeatable runs and find the dominant stage before tuning.
 
 The agent carries forward semantic end-of-turn detection, tuned barge-in, preemptive generation, and Moss grounding. Those settings are production configuration—re-test them against real visitor audio.
+
+For Exercise 6, trace the active handlers in `agent.py`, inspect several turns, then disconnect and read the final summary. The shipped worker is complete; no separate `agent_start.py` is required.
 
 ## 2. Deploy
 
@@ -45,6 +51,8 @@ Stop the local worker, authenticate once, then create the Cloud agent:
 
 ```bash
 lk cloud auth
+lk project list
+lk project set-default "<your-course-project-name>"
 cd sections/04-ship-it
 lk agent create --secrets-file=../../.env
 ```
@@ -52,14 +60,16 @@ lk agent create --secrets-file=../../.env
 The command builds the worker and injects the `MOSS_*` values from `.env`; LiveKit supplies the project credentials. Then:
 
 1. Run `lk agent secrets` to verify secret names.
-2. Confirm the agent becomes healthy in [LiveKit Cloud](https://cloud.livekit.io).
+2. Run `lk agent status` and confirm the agent becomes healthy in [LiveKit Cloud](https://cloud.livekit.io). Use `lk agent logs` to inspect startup and calls.
 3. Keep the generated `livekit.toml`; later releases use:
 
    ```bash
    lk agent deploy
    ```
 
-This directory is self-contained for deployment: its `pyproject.toml` and lockfile pin the validated dependencies, and its Dockerfile uses Debian Trixie so the Moss native wheel can install.
+This directory is self-contained for deployment: its `pyproject.toml` and lockfile pin the validated dependencies. The Debian Trixie Dockerfile prepares plugin assets and initializes the bundled local audio turn detector during the build, then copies the installed environment into the runtime image. A first Cloud build can exceed the demo slot; rehearse it before class.
+
+If you deleted a previous agent, inspect the project and follow [the recovery runbook](../../COURSE_READINESS.md#rebuild-a-deleted-cloud-agent). A stale `livekit.toml` cannot recreate a deleted deployment.
 
 ## 3. Call the deployed agent from the orb
 
@@ -90,7 +100,7 @@ browser ── WebRTC ──> LiveKit Cloud ── dispatch ──> deployed wor
 
 ## Concepts
 
-- Per-turn metrics via `metrics_collected`.
-- Session rollup via `metrics.UsageCollector` and `ctx.add_shutdown_callback`.
+- Per-turn metrics via `conversation_item_added` and `ChatMessage.metrics`.
+- Cumulative model usage via `session_usage_updated`, final `session.usage`, and `ctx.add_shutdown_callback`.
 - One-command deployment with `lk agent create`.
 - **Observe first, then deploy.**

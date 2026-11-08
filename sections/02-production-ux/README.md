@@ -1,4 +1,6 @@
-# Section 2: Turn detection that doesn't cut people off
+# Course Section 3: Turn detection that doesn't cut people off
+
+Directory 2 of 4: `02-production-ux`.
 
 ## Goal
 
@@ -6,11 +8,13 @@
 
 ## Run
 
-Complete the [root setup and pre-flight check](../../README.md#pre-class-setup) first. Stop the Section 1 worker, then run:
+Complete the [root setup and pre-flight check](../../README.md#pre-class-setup) first. Stop the Hello Voice worker, then run:
 
 ```bash
-uv run python sections/02-production-ux/agent.py dev
+lk agent dev sections/02-production-ux/agent.py
 ```
+
+Open the CLI’s Agent Console link and select the new `dev-...` deployment printed for this worker. Use the same project as `.env`; the prior section’s development deployment is a different target.
 
 ## Key takeaway
 >
@@ -21,18 +25,24 @@ uv run python sections/02-production-ux/agent.py dev
 ### 1. Semantic end-of-turn detection
 
 ```python
-turn_detection=MultilingualModel()
+turn_handling=TurnHandlingOptions(
+    turn_detection=inference.TurnDetector(version="v1-mini"),
+)
 ```
 
-The model uses the transcript as well as silence to decide whether the user has completed their thought. It replaces the Section 1 silence-only baseline.
+The built-in audio model uses spoken meaning and acoustic cues to detect completed turns. `v1-mini` runs locally on CPU, keeping the same model choice in development and Cloud. This replaces the Hello Voice VAD-only baseline; no text turn-detector plugin is needed.
 
 ### 2. Tuned barge-in
 
 ```python
-allow_interruptions=True
-min_interruption_duration=0.7
-min_interruption_words=2
-resume_false_interruption=True
+interruption={
+    "enabled": True,
+    "mode": "vad",
+    "min_duration": 0.7,
+    "min_words": 2,
+    "false_interruption_timeout": 2.0,
+    "resume_false_interruption": True,
+}
 ```
 
 - A real spoken interruption stops the agent.
@@ -43,33 +53,33 @@ resume_false_interruption=True
 ### 3. Preemptive generation
 
 ```python
-preemptive_generation=True
+preemptive_generation={"enabled": True}
 ```
 
-LiveKit can start LLM/TTS work from a stable interim transcript before final turn detection. If the user continues, it cancels that speculative work and regenerates from the completed turn.
+The `interruption` and `preemptive_generation` values are passed inside `TurnHandlingOptions`. LiveKit can start LLM/TTS work from a stable interim transcript before final turn detection. If the user continues, it cancels that speculative work and regenerates from the completed turn.
 
-> **Important:** preemptive generation means component timings can overlap. Use `perceived`, not the sum of EOU, LLM, and TTS timings.
+> **Important:** preemptive generation means component timings can overlap. Use `server_e2e`, not the sum of EOU, LLM, and TTS timings.
 
 ## Test the contrast
 
-Repeat the Section 1 script with the same words and **2-second** pauses:
+Repeat the Hello Voice script with the same words and **2-second** pauses:
 
 1. Pause after “Hmm, the thing I want to ask is.”
 2. Pause after “What’s the weather,” then add “in Lisbon?”
 3. Speak a full sentence over the agent.
 4. Say only “mm-hm” while it speaks.
 
-Expected result: it waits through the unfinished phrases, stops for the full interruption, and continues through the backchannel. If both versions wait, use a **3-second** pause.
+Expected result: it is more likely to wait through unfinished phrases, stop for a full interruption, and continue through a backchannel. Repeat several turns: the model also has endpointing limits and can commit a turn during a long pause. Inspect the observed behavior instead of treating any phrase as a guaranteed test case.
 
 ```text
-[latency] perceived=...ms response=COMPLETE preemptive=on | ...
+[latency] server_e2e=...ms response=COMPLETE preemptive=on | ...
 ```
 
-`perceived` is LiveKit’s speech-end → first-server-audio measurement. Compare several complete turns with Section 1; a median is more useful than one lucky run.
+`server_e2e` is LiveKit’s speech-end → first-server-audio measurement, read from `ChatMessage.metrics["e2e_latency"]`. It excludes network delivery and browser playback. Compare several complete turns with Hello Voice; a median is more useful than one lucky run.
 
 ## Concepts
 
-- `MultilingualModel` provides semantic end-of-turn detection.
+- `inference.TurnDetector(version="v1-mini")` provides local audio-based semantic end-of-turn detection. The older transcript-based `MultilingualModel` plugin is deprecated.
 - `preemptive_generation` overlaps inference with turn detection.
 - Turn detection is about the **user’s** turn; barge-in is about the **agent’s** reply.
 

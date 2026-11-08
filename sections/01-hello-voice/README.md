@@ -1,4 +1,6 @@
-# Section 1: Hello voice
+# Course Section 2: Hello voice
+
+Directory 1 of 4: `01-hello-voice`.
 
 ## Goal
 
@@ -6,13 +8,13 @@
 
 ## Run
 
-Complete the [root setup and pre-flight check](../../README.md#pre-class-setup) first. Use the same LiveKit Cloud project in the Playground as the one configured in `.env`, and stop any other local workers.
+Complete the [root setup and pre-flight check](../../README.md#pre-class-setup) first. Use LiveKit CLI 2.19.3+ with the same project as `.env`, and stop the earlier section’s local worker.
 
 ```bash
-uv run python sections/01-hello-voice/agent.py dev
+lk agent dev sections/01-hello-voice/agent.py
 ```
 
-Open [Agents Playground](https://agents-playground.livekit.io), connect, and keep the terminal visible. Use headphones.
+Open the Agent Console link printed by the CLI, or launch [Agent Console](https://docs.livekit.io/testing/agent-console/) from the same project’s dashboard. Select the exact `dev-...` development deployment printed in the terminal before starting the session. Keep the terminal visible and use headphones. Default production/older Playground dispatch will not target this dev worker.
 
 ## Key takeaway
 >
@@ -27,7 +29,7 @@ LiveKit Inference supplies STT, LLM, and TTS from the shorthand model names. Sil
 ## Read the timing
 
 ```text
-[timing] end-of-utterance delay: ...
+[timing] end-of-turn delay: ...
 [timing] transcription delay:    ...
 [timing] LLM TTFT (first token): ...
 [timing] TTS TTFB (first byte):  ...
@@ -36,7 +38,7 @@ LiveKit Inference supplies STT, LLM, and TTS from the shorthand model names. Sil
 
 - **TTFT** is when the LLM starts responding.
 - **TTFB** is when TTS returns its first audio chunk.
-- **`TOTAL`** is this agent's speech-end → first-audio estimate: EOU delay + LLM TTFT + first TTS TTFB. Do not add transcription delay too; it overlaps the EOU window.
+- **`TOTAL`** comes directly from `ChatMessage.metrics["e2e_latency"]`: speech-end → first server audio. It excludes network delivery and browser playback. Compare it with the wait you hear; do not add overlapping component timings.
 - The greeting has no `TOTAL`, because no user turn preceded it.
 
 ## Feel the broken baseline
@@ -44,8 +46,11 @@ LiveKit Inference supplies STT, LLM, and TTS from the shorthand model names. Sil
 This worker deliberately sets:
 
 ```python
-allow_interruptions=False
-discard_audio_if_uninterruptible=True
+turn_handling=TurnHandlingOptions(
+    turn_detection="vad",
+    interruption={"enabled": False, "discard_audio_if_uninterruptible": True},
+    preemptive_generation={"enabled": False},
+)
 ```
 
 > **Key point:** turn detection decides when the *user* is done; interruption decides when the *agent* stops. They are separate problems.
@@ -57,10 +62,10 @@ Try these, and note **jumped in** or **waited**:
 3. “What’s the weather” — pause **2 seconds**, then finish: “in Lisbon?”
 4. Talk over the agent during any reply.
 
-The silence-only baseline may reply mid-thought. When you talk over it, it keeps speaking and drops your audio. Stop it with `Ctrl+C`, then repeat the same script in [Section 2](../02-production-ux/README.md).
+The silence-only baseline may reply mid-thought. When you talk over it, it keeps speaking and drops your audio. Stop it with `Ctrl+C`, then repeat the same script in [course Section 3](../02-production-ux/README.md).
 
 ## Concepts
 
 - `AgentSession` runs the STT → LLM → TTS pipeline.
 - `Agent` contains instructions and response behavior.
-- `JobContext` is the room handle; `WorkerOptions` registers the worker entrypoint.
+- `JobContext` is the room handle; `AgentServer` registers the entrypoint with `@server.rtc_session()`; `cli.run_app(server)` starts it.

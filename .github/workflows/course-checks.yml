@@ -1,0 +1,66 @@
+name: Course checks
+
+on:
+  push:
+    branches: [main, 'codex/**']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  python:
+    name: Python ${{ matrix.python }} / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {os: ubuntu-24.04, python: '3.11'}
+          - {os: ubuntu-24.04, python: '3.14'}
+          - {os: macos-15, python: '3.13'}
+          - {os: windows-2025, python: '3.13'}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.3.3
+        with:
+          version: '0.11.6'
+          enable-cache: true
+          python-version: ${{ matrix.python }}
+      - run: uv lock --check
+      - run: uv sync --frozen
+      - name: Prepare local model assets (Linux)
+        if: runner.os == 'Linux'
+        run: uv run --frozen -m livekit.agents download-files
+      - name: Load local models and run native silence inference (Linux)
+        if: runner.os == 'Linux'
+        run: uv run --frozen python scripts/smoke_models.py
+      - run: uv run --frozen python -m unittest discover -s tests -v
+      - name: Check every course command imports without credentials
+        shell: bash
+        run: |
+          for section in sections/*/agent.py; do
+            uv run --frozen python "$section" --help
+          done
+      - name: Validate the self-contained deployment project
+        working-directory: sections/04-ship-it
+        run: uv lock --check
+      - name: Install deployment environment from its lock
+        working-directory: sections/04-ship-it
+        run: uv sync --frozen
+      - name: Import the deployment entrypoint
+        working-directory: sections/04-ship-it
+        run: uv run --frozen python agent.py --help
+
+  browser-and-docs:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+      - run: node --test tests/orb.test.cjs
+      - run: npx --yes markdownlint-cli2@0.20.0

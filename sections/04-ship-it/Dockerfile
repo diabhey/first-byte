@@ -2,10 +2,8 @@
 # For more information on the build process, see https://docs.livekit.io/agents/ops/deployment/builds/
 # syntax=docker/dockerfile:1
 
-# Use Python 3.13 on Debian Trixie (glibc 2.38) so wheels that require
-# manylinux_2_38+ install cleanly. Notably, inferedge-moss-core (the binary
-# behind the `moss` package) only ships manylinux_2_38_x86_64 wheels for
-# Linux x86_64, which the older bookworm-slim base (glibc 2.36) cannot use.
+# Use Python 3.13 on Debian Trixie. Current Moss wheels support glibc 2.28+;
+# keep the known course image rather than changing its OS during the SDK upgrade.
 # uv is installed by copying its statically-linked binary from astral's image.
 ARG PYTHON_VERSION=3.13
 FROM python:${PYTHON_VERSION}-slim-trixie AS base
@@ -52,7 +50,9 @@ COPY . .
 # Pre-download any ML models or files the agent needs
 # This ensures the container is ready to run immediately without downloading
 # dependencies at runtime, which improves startup time and reliability
-RUN uv run "agent.py" download-files
+RUN uv run --locked -m livekit.agents download-files
+# The v1-mini turn model ships in livekit-local-inference, not a per-user cache.
+RUN uv run --locked python -c "from livekit.local_inference import init_eot; init_eot()"
 
 # --- Production stage ---
 # Build tools (gcc, g++, python3-dev) are not included in the final image
@@ -82,4 +82,4 @@ USER appuser
 # Run the application using UV
 # UV will activate the virtual environment and run the agent.
 # The "start" command tells the worker to connect to LiveKit and begin waiting for jobs.
-CMD ["uv", "run", "agent.py", "start"]
+CMD ["uv", "run", "--locked", "--no-sync", "-m", "livekit.agents", "start", "agent.py"]

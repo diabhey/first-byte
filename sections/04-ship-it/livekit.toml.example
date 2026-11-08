@@ -2,9 +2,10 @@
 # directory on a successful deploy. Each student generates their own; the
 # real `livekit.toml` is gitignored.
 #
-# After your deploy succeeds, copy the auto-generated `livekit.toml` next
-# to this file (do not commit it). For subsequent updates, `lk agent
-# deploy` reads `livekit.toml` and rolls a new container.
+# On success, the CLI writes `livekit.toml` next to this file. Keep that
+# generated file locally (do not commit it). For subsequent updates,
+# `lk agent deploy` reads it and rolls a new container. A deleted agent
+# needs a new `lk agent create`; do not reuse its old ID.
 
 [project]
   subdomain = "YOUR-PROJECT-XXXXXX"
