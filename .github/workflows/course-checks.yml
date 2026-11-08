@@ -24,7 +24,7 @@ jobs:
           - {os: windows-2025, python: '3.13'}
     steps:
       - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v10
+      - uses: astral-sh/setup-uv@v10.3.3
         with:
           version: '0.11.6'
           enable-cache: true
