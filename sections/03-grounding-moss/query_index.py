@@ -8,7 +8,7 @@ Usage:
     uv run python sections/03-grounding-moss/query_index.py "..." --top-k 3 --alpha 0.5
 
 Tip: re-run with different alpha values (0.0 keyword-only, 1.0 semantic-only,
-0.5 default) on the same query. The ordering of docs that come back is the
+0.8 course default) on the same query. The ordering of docs that come back is the
 clearest demonstration of what alpha does.
 """
 
@@ -16,11 +16,12 @@ import argparse
 import asyncio
 import os
 import time
+from pathlib import Path
 
 from dotenv import load_dotenv
 from moss import MossClient, QueryOptions
 
-load_dotenv()
+load_dotenv(Path(__file__).resolve().parents[2] / ".env")
 
 
 async def main(query: str, top_k: int, alpha: float) -> None:
@@ -28,19 +29,19 @@ async def main(query: str, top_k: int, alpha: float) -> None:
     project_key = os.environ["MOSS_PROJECT_KEY"]
     index_name = os.environ["MOSS_INDEX_NAME"]
 
-    client = MossClient(project_id=project_id, project_key=project_key)
     print(f"index={index_name!r}  query={query!r}  top_k={top_k}  alpha={alpha}\n")
 
     # Pre-load the index in-process, exactly like the agent does at startup.
     # Without this, query() falls back to a cloud lookup: slower, and a network
     # dependency this course exists to avoid.
-    t0 = time.perf_counter()
-    await client.load_index(index_name)
-    print(f"(index loaded in-process in {time.perf_counter() - t0:.2f}s)\n")
+    async with MossClient(project_id=project_id, project_key=project_key) as client:
+        t0 = time.perf_counter()
+        await client.load_index(index_name)
+        print(f"(index loaded in-process in {time.perf_counter() - t0:.2f}s)\n")
 
-    t0 = time.perf_counter()
-    results = await client.query(index_name, query, QueryOptions(top_k=top_k, alpha=alpha))
-    query_ms = (time.perf_counter() - t0) * 1000
+        t0 = time.perf_counter()
+        results = await client.query(index_name, query, QueryOptions(top_k=top_k, alpha=alpha))
+        query_ms = (time.perf_counter() - t0) * 1000
     print(f"(query ran in {query_ms:.1f} ms in-process)\n")
     if not results.docs:
         print("(no results)")
@@ -64,4 +65,8 @@ if __name__ == "__main__":
     parser.add_argument("--top-k", type=int, default=5)
     parser.add_argument("--alpha", type=float, default=0.8)
     args = parser.parse_args()
+    if args.top_k < 1:
+        parser.error("--top-k must be at least 1")
+    if not 0.0 <= args.alpha <= 1.0:
+        parser.error("--alpha must be between 0.0 and 1.0")
     asyncio.run(main(args.query, args.top_k, args.alpha))

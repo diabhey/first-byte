@@ -6,9 +6,10 @@ The Inference layer routes STT to Deepgram, the LLM to OpenAI, and TTS to
 Cartesia, all billed via your LiveKit account.
 
 Run:
-    uv run python sections/01-hello-voice/agent.py dev
+    lk agent dev sections/01-hello-voice/agent.py
 
-Then open https://agents-playground.livekit.io and connect.
+Then open your LiveKit Cloud project's Agent Console, select the dev deployment
+printed by the CLI, and connect.
 Watch the terminal for [timing] lines after each turn.
 """
 
@@ -16,15 +17,17 @@ from dotenv import load_dotenv
 from livekit.agents import (
     Agent,
     AgentSession,
+    AgentServer,
+    ChatMessage,
+    ConversationItemAddedEvent,
     JobContext,
-    MetricsCollectedEvent,
-    WorkerOptions,
+    TurnHandlingOptions,
     cli,
 )
-from livekit.agents.metrics import EOUMetrics, LLMMetrics, TTSMetrics
 from livekit.plugins import silero
 
 load_dotenv()
+server = AgentServer()
 
 
 class HelloAgent(Agent):
@@ -44,53 +47,35 @@ class HelloAgent(Agent):
 
 
 def _attach_timing_logs(session: AgentSession) -> None:
-    """Print turn latency so you can A/B Section 1 vs Section 2 in the terminal."""
-    # Stages of the current turn, held until first audio so we can total them.
-    # Only these three are additive: end-of-utterance delay and transcription
-    # delay are both measured from the moment you stop speaking, so the
-    # transcription wait already sits inside the end-of-utterance delay.
-    turn: dict[str, float] = {}
-
-    def _print_total() -> None:
-        if not {"eou", "llm", "tts"} <= turn.keys():
+    """Read component timing and server-side first-audio latency per turn."""
+    @session.on("conversation_item_added")
+    def _on_conversation_item_added(ev: ConversationItemAddedEvent) -> None:
+        item = ev.item
+        if not isinstance(item, ChatMessage):
             return
-        total_ms = (turn["eou"] + turn["llm"] + turn["tts"]) * 1000
-        print(
-            f"[timing] TOTAL end-to-end:       {total_ms:.0f}ms "
-            f"(speech end → first audio byte)"
-        )
-        turn.clear()
-
-    @session.on("metrics_collected")
-    def _on_metrics(ev: MetricsCollectedEvent) -> None:
-        m = ev.metrics
-        if isinstance(m, EOUMetrics):
-            # How long after you stopped speaking before the turn was committed.
-            # On unfinished phrases with a long pause, Section 1 is often large
-            # here because silence alone ended the turn.
-            turn.clear()
-            turn["eou"] = m.end_of_utterance_delay
-            print(
-                f"[timing] end-of-utterance delay: {m.end_of_utterance_delay:.2f}s "
-                f"(silence → turn committed)"
-            )
-            print(
-                f"[timing] transcription delay:    {m.transcription_delay:.2f}s "
-                f"(speech end → final transcript)"
-            )
-        elif isinstance(m, LLMMetrics) and not m.cancelled:
-            turn["llm"] = m.ttft
-            print(f"[timing] LLM TTFT (first token): {m.ttft:.2f}s")
-            _print_total()
-        elif isinstance(m, TTSMetrics) and not m.cancelled:
-            # Course namesake metric: delay inside TTS until first audio chunk.
-            # A reply can arrive as several TTS segments; only the first one
-            # contributes to first-audio latency.
-            turn.setdefault("tts", m.ttfb)
-            print(f"[timing] TTS TTFB (first byte):  {m.ttfb:.2f}s")
-            _print_total()
+        if item.role == "user":
+            for key, label in (
+                ("end_of_turn_delay", "end-of-turn delay"),
+                ("transcription_delay", "transcription delay"),
+            ):
+                value = item.metrics.get(key)
+                if value is not None:
+                    print(f"[timing] {label}: {value:.2f}s")
+        elif item.role == "assistant":
+            for key, label in (
+                ("llm_node_ttft", "LLM TTFT (first token)"),
+                ("tts_node_ttfb", "TTS TTFB (first byte)"),
+            ):
+                value = item.metrics.get(key)
+                if value is not None:
+                    print(f"[timing] {label}: {value:.2f}s")
+            total = item.metrics.get("e2e_latency")
+            if total is not None:
+                print(f"[timing] TOTAL end-to-end: {total * 1000:.0f}ms "
+                      "(speech end → first server audio; excludes network/playback)")
 
 
+@server.rtc_session()
 async def entrypoint(ctx: JobContext) -> None:
     await ctx.connect()
 
@@ -99,14 +84,13 @@ async def entrypoint(ctx: JobContext) -> None:
         llm="openai/gpt-4o-mini",
         tts="cartesia/sonic-3",
         vad=silero.VAD.load(),
-        # Deliberately broken baseline. Talk over the agent and it keeps going
-        # to the end of its reply, because nothing is listening for barge-in.
-        # LiveKit's default is True; Section 2 turns it back on and tunes it.
-        allow_interruptions=False,
-        # The other half of the problem: while the agent is speaking and cannot
-        # be interrupted, your audio is thrown away rather than buffered. So
-        # the agent does not just talk over you, it never hears what you said.
-        discard_audio_if_uninterruptible=True,
+        # Deliberately broken baseline: VAD-only, no barge-in, and no
+        # speculative generation. Compare it with the next section.
+        turn_handling=TurnHandlingOptions(
+            turn_detection="vad",
+            interruption={"enabled": False, "discard_audio_if_uninterruptible": True},
+            preemptive_generation={"enabled": False},
+        ),
     )
     _attach_timing_logs(session)
 
@@ -114,4 +98,4 @@ async def entrypoint(ctx: JobContext) -> None:
 
 
 if __name__ == "__main__":
-    cli.run_app(WorkerOptions(entrypoint_fnc=entrypoint))
+    cli.run_app(server)

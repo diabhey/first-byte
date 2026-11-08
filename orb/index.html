@@ -167,7 +167,7 @@
       <button class="orb-tap" id="orbButton" aria-label="Tap to talk with the HeartByte agent"></button>
       <div class="state-anchor" id="stateAnchor" data-state="idle">
         <span class="anchor-rule" aria-hidden="true"></span>
-        <span class="state-label" id="topStatus">tap to talk</span>
+        <span class="state-label" id="topStatus" aria-live="polite">tap to talk</span>
         <span class="anchor-rule" aria-hidden="true"></span>
       </div>
     </main>
@@ -179,7 +179,7 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/livekit-client@2.21.0/dist/livekit-client.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/livekit-client@2.23.0/dist/livekit-client.umd.min.js"></script>
   <script src="config.js"></script>
   <script>
   (() => {
@@ -191,11 +191,21 @@
     const stateAnchor = document.getElementById('stateAnchor');
     const canvas      = document.getElementById('orb');
 
-    if (!cfg || !cfg.URL || !cfg.TOKEN || cfg.TOKEN === 'YOUR_LIVEKIT_TOKEN') {
+    const configured = Boolean(cfg && cfg.URL && cfg.TOKEN
+      && !cfg.URL.includes('YOUR-PROJECT') && cfg.TOKEN !== 'YOUR_LIVEKIT_TOKEN');
+    if (!configured) {
       topStatus.textContent = 'configure config.js';
       stateAnchor.setAttribute('data-state', 'error');
       orbButton.disabled = true;
       console.warn('[orb] config.js missing or unfilled. See README.md');
+    }
+
+    if (!window.THREE || !window.LivekitClient) {
+      topStatus.textContent = 'reload with internet access';
+      stateAnchor.setAttribute('data-state', 'error');
+      orbButton.disabled = true;
+      console.warn('[orb] A browser library could not load from the CDN.');
+      return;
     }
 
     // ── State machine ──────────────────────────────────────────────────────
@@ -339,8 +349,8 @@
     // ── Render loop ─────────────────────────────────────────────────────────
     const clock = new THREE.Clock();
     function animate() {
-      const t  = clock.getElapsedTime();
       const dt = Math.min(0.05, clock.getDelta());
+      const t = clock.elapsedTime;
 
       let rawVol = 0;
       if (state === 'speaking')       rawVol = readVolume(agentAnalyser);
@@ -366,98 +376,118 @@
     requestAnimationFrame(animate);
 
     // ── LiveKit connection ─────────────────────────────────────────────────
-    let room = null, stateTimer = null, userEndedSession = false;
+    let room = null;
+    const attachedAudio = new Map();
 
-    function queueThinkingFallback() {
-      clearTimeout(stateTimer);
-      if (state === 'listening') {
-        stateTimer = setTimeout(() => {
-          if (state === 'listening') setState('thinking');
-        }, 2200);
-      }
+    function removeTrack(track) {
+      if (!attachedAudio.has(track)) return;
+      const element = attachedAudio.get(track);
+      track.detach();
+      if (element) element.remove();
+      attachedAudio.delete(track);
+      agentAnalyser = null;
+    }
+
+    function clearAudio() {
+      for (const track of attachedAudio.keys()) removeTrack(track);
+      localAnalyser = null;
+      agentAnalyser = null;
     }
 
     async function startConversation() {
-      if (!cfg || !cfg.URL || !cfg.TOKEN || cfg.TOKEN === 'YOUR_LIVEKIT_TOKEN') return;
-      if (['connecting', 'listening', 'thinking', 'speaking'].includes(state)) return;
+      if (!configured || room) return;
       setState('connecting');
+
+      const LK = window.LivekitClient;
+      const connection = new LK.Room({
+        adaptiveStream: true,
+        dynacast: true,
+        audioCaptureDefaults: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
+      });
+      room = connection;
+
+      connection.on(LK.RoomEvent.TrackSubscribed, (track) => {
+        if (room !== connection || track.kind !== LK.Track.Kind.Audio) return;
+        const audioEl = track.attach();
+        audioEl.autoplay = true;
+        audioEl.playsInline = true;
+        audioEl.style.display = 'none';
+        document.body.appendChild(audioEl);
+        attachedAudio.set(track, audioEl);
+        try {
+          agentAnalyser = makeAnalyser(new MediaStream([track.mediaStreamTrack]));
+        } catch (err) { console.warn('agent analyser failed', err); }
+      });
+      connection.on(LK.RoomEvent.TrackUnsubscribed, removeTrack);
+
+      connection.on(LK.RoomEvent.ActiveSpeakersChanged, (speakers) => {
+        if (room !== connection) return;
+        const me = connection.localParticipant.identity;
+        const userTalking = speakers.some((participant) => participant.identity === me);
+        const agentTalking = speakers.some((participant) => participant.identity !== me);
+        if (agentTalking) setState('speaking');
+        else if (userTalking) setState('listening');
+        else if (state !== 'connecting') setState('thinking');
+      });
+
+      connection.on(LK.RoomEvent.Disconnected, () => {
+        if (room !== connection) return;
+        room = null;
+        clearAudio();
+        setState('error');
+      });
 
       try {
         ensureAudioCtx();
         if (audioCtx.state === 'suspended') await audioCtx.resume();
-
-        const LK = window.LivekitClient;
-        room = new LK.Room({
-          adaptiveStream: true,
-          dynacast: true,
-          audioCaptureDefaults: {
-            echoCancellation: true,
-            noiseSuppression: true,
-            autoGainControl: true,
-          },
-        });
-
-        room.on(LK.RoomEvent.TrackSubscribed, (track) => {
-          if (track.kind === LK.Track.Kind.Audio) {
-            const audioEl = track.attach();
-            audioEl.autoplay = true;
-            audioEl.playsInline = true;
-            audioEl.style.display = 'none';
-            document.body.appendChild(audioEl);
-            try {
-              const ms = new MediaStream([track.mediaStreamTrack]);
-              agentAnalyser = makeAnalyser(ms);
-            } catch (e) { console.warn('agent analyser failed', e); }
-          }
-        });
-
-        room.on(LK.RoomEvent.ActiveSpeakersChanged, (speakers) => {
-          const me = room.localParticipant && room.localParticipant.identity;
-          const userTalking  = speakers.some((p) => p.identity === me);
-          const agentTalking = speakers.some((p) => p.identity !== me);
-          if (agentTalking)       setState('speaking');
-          else if (userTalking) { setState('listening'); queueThinkingFallback(); }
-          else if (state !== 'connecting') setState('thinking');
-        });
-
-        room.on(LK.RoomEvent.Disconnected, () => {
-          clearTimeout(stateTimer);
-          localAnalyser = null;
-          agentAnalyser = null;
-          if (userEndedSession) { userEndedSession = false; setState('idle'); }
-          else { setState('error'); }
-        });
-
-        await room.connect(cfg.URL, cfg.TOKEN);
-        await room.localParticipant.setMicrophoneEnabled(true);
-
-        const mic = room.localParticipant.getTrackPublication(LK.Track.Source.Microphone);
+        await connection.startAudio();
+        await connection.connect(cfg.URL, cfg.TOKEN);
+        if (room !== connection) {
+          await connection.disconnect(); // stopped while connecting
+          return;
+        }
+        await connection.localParticipant.setMicrophoneEnabled(true);
+        if (room !== connection) {
+          await connection.disconnect(); // stopped during the permission prompt
+          return;
+        }
+        const mic = connection.localParticipant.getTrackPublication(LK.Track.Source.Microphone);
         if (mic && mic.audioTrack) {
-          const ms = new MediaStream([mic.audioTrack.mediaStreamTrack]);
-          localAnalyser = makeAnalyser(ms);
+          localAnalyser = makeAnalyser(new MediaStream([mic.audioTrack.mediaStreamTrack]));
         }
         setState('listening');
       } catch (err) {
-        console.error(err);
+        if (room !== connection) return;
+        room = null;
+        await connection.disconnect().catch(() => {});
+        clearAudio();
+        console.error('[orb] Could not connect. Check the token, project URL, and microphone permission.', err);
         setState('error');
       }
     }
 
     async function endConversation() {
-      if (!room) return;
-      userEndedSession = true;
-      try { await room.disconnect(); } catch (e) { console.warn('disconnect failed', e); }
-      room = null;
+      const connection = room;
+      if (!connection) return;
+      room = null; // ignore late events from this connection
+      clearAudio();
+      setState('idle');
+      try { await connection.disconnect(); }
+      catch (err) { console.warn('disconnect failed', err); }
     }
 
     function toggleConversation() {
-      const live = ['connecting', 'listening', 'thinking', 'speaking'];
-      if (live.includes(state)) endConversation();
+      if (room) endConversation();
       else startConversation();
     }
 
     orbButton.addEventListener('click', toggleConversation);
-    setState('idle');
+    // Keep the setup error visible until config.js is populated and reloaded.
+    if (configured) setState('idle');
   })();
   </script>
 </body>

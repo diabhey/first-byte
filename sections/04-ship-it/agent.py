@@ -6,7 +6,7 @@ ready for deployment. Run it locally, inspect per-turn latency and cumulative
 session usage, then deploy the same worker with `lk agent create`.
 
 Run locally:
-    uv run python sections/04-ship-it/agent.py dev
+    lk agent dev sections/04-ship-it/agent.py
 
 Deploy to LiveKit Cloud Agents:
     cd sections/04-ship-it
@@ -15,27 +15,27 @@ Deploy to LiveKit Cloud Agents:
 
 import os
 import sys
-from dataclasses import dataclass
 
 from dotenv import load_dotenv
 from livekit.agents import (
     Agent,
     AgentSession,
+    AgentServer,
     ChatContext,
     ChatMessage,
     ConversationItemAddedEvent,
     JobContext,
-    MetricsCollectedEvent,
-    WorkerOptions,
+    TurnHandlingOptions,
     cli,
-    metrics,
+    inference,
+    SessionUsageUpdatedEvent,
 )
-from livekit.agents.metrics import AgentMetrics, EOUMetrics, LLMMetrics, STTMetrics, TTSMetrics
+from livekit.agents.metrics import AgentSessionUsage, LLMModelUsage, STTModelUsage, TTSModelUsage
 from livekit.plugins import silero
-from livekit.plugins.turn_detector.multilingual import MultilingualModel
 from moss import MossClient, QueryOptions, QueryResultDocumentInfo
 
 load_dotenv()
+server = AgentServer()
 
 # Colour is a local-development affordance. A deployed worker writes to
 # LiveKit Cloud's log pipeline, where stdout is not a terminal and escape
@@ -124,22 +124,6 @@ def format_document(index: int, doc: QueryResultDocumentInfo) -> str:
     return f"<document-{index}{label}>\n{doc.text}\n</document-{index}>"
 
 
-@dataclass
-class TurnLatency:
-    """Metrics needed for one end-of-speech → first-audio summary."""
-
-    speech_id: str
-    eou_delay: float
-    transcription_delay: float
-    retrieval_delay: float
-    eou_emitted_at: float
-    total: float | None = None
-    llm_ttft: float | None = None
-    tts_ttfb: float | None = None
-    cancelled: bool = False
-    printed: bool = False
-
-
 class HeartByteAgent(Agent):
     def __init__(self, moss_client: MossClient, index_name: str) -> None:
         super().__init__(instructions=SYSTEM_PROMPT)
@@ -194,94 +178,78 @@ class HeartByteAgent(Agent):
         return await super().on_user_turn_completed(turn_ctx, new_message)
 
 
-def _print_metric(metric: AgentMetrics) -> None:
-    """Render LiveKit's structured metrics as readable classroom output."""
-    if isinstance(metric, STTMetrics):
-        log_metric(
-            "STT",
-            "blue",
-            field("audio", f"{metric.audio_duration:.2f}s"),
-            field("streamed", str(metric.streamed).lower()),
-        )
-    elif isinstance(metric, EOUMetrics):
-        log_metric(
-            "EOU",
-            "magenta",
-            field("delay", f"{metric.end_of_utterance_delay:.2f}s"),
-            field("transcription", f"{metric.transcription_delay:.2f}s"),
-        )
-    elif isinstance(metric, LLMMetrics):
-        if metric.cancelled:
-            log_metric(
-                "LLM",
-                "yellow",
-                field("cancelled", "true", "yellow"),
-                field("prompt", str(metric.prompt_tokens)),
-                field("completion", str(metric.completion_tokens)),
-            )
-        else:
-            log_metric(
-                "LLM",
-                "yellow",
-                field("ttft", f"{metric.ttft:.2f}s"),
-                field("prompt", str(metric.prompt_tokens)),
-                field("completion", str(metric.completion_tokens)),
-                field("tokens/s", f"{metric.tokens_per_second:.1f}"),
-            )
-    elif isinstance(metric, TTSMetrics):
-        if metric.cancelled:
-            log_metric(
-                "TTS",
-                "green",
-                field("cancelled", "true", "yellow"),
-                field("audio", f"{metric.audio_duration:.2f}s"),
-                field("chars", str(metric.characters_count)),
-            )
-        else:
-            log_metric(
-                "TTS",
-                "green",
-                field("ttfb", f"{metric.ttfb:.2f}s"),
-                field("audio", f"{metric.audio_duration:.2f}s"),
-                field("chars", str(metric.characters_count)),
-            )
-
-
-def _print_turn_latency(turn: TurnLatency) -> bool:
-    """Print perceived latency and the per-stage breakdown behind it.
-
-    No pass/fail verdict: the stages overlap, the agent only partly controls
-    them, and a single threshold hides more than it explains. Read the
-    breakdown and see which stage dominated the turn.
-    """
-    if turn.printed or turn.total is None:
-        return False
-
-    turn.printed = True
-    response_status = "CANCELLED" if turn.cancelled else "COMPLETE"
-    response_style = "yellow" if turn.cancelled else "green"
-    llm_ttft = f"{turn.llm_ttft * 1000:.0f}ms" if turn.llm_ttft is not None else "n/a"
-    tts_ttfb = f"{turn.tts_ttfb * 1000:.0f}ms" if turn.tts_ttfb is not None else "n/a"
+def _print_usage(usage: AgentSessionUsage, label: str) -> None:
+    """Each event is a cumulative snapshot: never add snapshots together."""
+    llm_prompt = llm_completion = tts_chars = 0
+    stt_audio = tts_audio = 0.0
+    for model in usage.model_usage:
+        if isinstance(model, LLMModelUsage):
+            llm_prompt += model.input_tokens
+            llm_completion += model.output_tokens
+        elif isinstance(model, STTModelUsage):
+            stt_audio += model.audio_duration
+        elif isinstance(model, TTSModelUsage):
+            tts_audio += model.audio_duration
+            tts_chars += model.characters_count
     log(
-        "latency",
-        "magenta",
-        " ".join(
-            [
-                field("perceived", f"{round(turn.total * 1000)}ms", "bold"),
-                field("response", response_status, response_style),
-                field("preemptive", "on"),
-                paint("|", "dim"),
-                field("eou", f"{turn.eou_delay * 1000:.0f}ms"),
-                field("stt_final", f"{turn.transcription_delay * 1000:.0f}ms"),
-                field("retrieval", f"{turn.retrieval_delay * 1000:.0f}ms"),
-                field("llm_ttft", llm_ttft),
-                field("tts_ttfb", tts_ttfb),
-            ]
-        ),
+        "usage", "cyan",
+        f"{paint(label + ':', 'bold')} " + " ".join([
+            field("llm_prompt", str(llm_prompt)),
+            field("llm_completion", str(llm_completion)),
+            field("stt_audio", f"{stt_audio:.2f}s"),
+            field("tts_audio", f"{tts_audio:.2f}s"),
+            field("tts_chars", str(tts_chars)),
+        ]),
     )
-    return True
 
 
+def _attach_observability(session: AgentSession, ctx: JobContext) -> None:
+    """Observe message timing, cumulative model usage, and final usage."""
+    @session.on("conversation_item_added")
+    def _on_conversation_item_added(ev: ConversationItemAddedEvent) -> None:
+        item = ev.item
+        if not isinstance(item, ChatMessage):
+            return
+        # These user-side measurements overlap: transcription is already
+        # included in the time spent deciding the end of the user's turn.
+        if item.role == "user":
+            for key, stage, label in (
+                ("end_of_turn_delay", "EOU", "delay"),
+                ("transcription_delay", "STT", "final_transcript"),
+                ("on_user_turn_completed_delay", "RAG", "hook"),
+            ):
+                value = item.metrics.get(key)
+                if value is not None:
+                    log_metric(stage, "blue", field(label, f"{value:.2f}s"))
+        elif item.role == "assistant":
+            for key, stage, label in (
+                ("llm_node_ttft", "LLM", "ttft"),
+                ("tts_node_ttfb", "TTS", "ttfb"),
+            ):
+                value = item.metrics.get(key)
+                if value is not None:
+                    log_metric(stage, "green", field(label, f"{value:.2f}s"))
+            total = item.metrics.get("e2e_latency")
+            if total is None:
+                return  # greeting has no preceding user turn
+            status = "CANCELLED" if item.interrupted else "COMPLETE"
+            log("latency", "magenta", " ".join([
+                field("server_e2e", f"{total * 1000:.0f}ms", "bold"),
+                field("response", status),
+                field("preemptive", "on"),
+            ]))
+
+    @session.on("session_usage_updated")
+    def _on_session_usage_updated(ev: SessionUsageUpdatedEvent) -> None:
+        _print_usage(ev.usage, "cumulative")
+
+    async def _log_session_summary() -> None:
+        _print_usage(session.usage, "session summary")
+
+    ctx.add_shutdown_callback(_log_session_summary)
+
+
+@server.rtc_session()
 async def entrypoint(ctx: JobContext) -> None:
     await ctx.connect()
 
@@ -290,6 +258,7 @@ async def entrypoint(ctx: JobContext) -> None:
     index_name = os.environ["MOSS_INDEX_NAME"]
 
     moss = MossClient(project_id=project_id, project_key=project_key)
+    ctx.add_shutdown_callback(moss.close)
     try:
         await moss.load_index(index_name)
         log("moss", "blue", f"index {paint(index_name, 'bold')} loaded")
@@ -305,114 +274,31 @@ async def entrypoint(ctx: JobContext) -> None:
         llm="openai/gpt-4o-mini",
         tts="cartesia/sonic-3",
         vad=silero.VAD.load(min_silence_duration=0.25),
-        turn_detection=MultilingualModel(),
-        # Interruption settings carried forward from Section 2. Barge-in on,
-        # but a cough or an "mm-hm" must not cut the agent off mid-answer.
-        # These ship to production with the worker, so tune them against real
-        # visitor audio rather than leaving the defaults.
-        allow_interruptions=True,
-        discard_audio_if_uninterruptible=False,
-        min_interruption_duration=0.7,
-        min_interruption_words=2,
-        false_interruption_timeout=2.0,
-        resume_false_interruption=True,
-        # Carry Section 2's latency optimization into the deployed worker.
-        # Grounded turns remain correct: LiveKit invalidates speculative output
-        # whenever on_user_turn_completed changes the temporary chat context.
-        preemptive_generation=True,
+        # The current local audio model decides when the USER has finished.
+        # Interruption handling separately decides when to stop the AGENT.
+        turn_handling=TurnHandlingOptions(
+            turn_detection=inference.TurnDetector(version="v1-mini"),
+            interruption={
+                "enabled": True,
+                "mode": "vad",
+                "discard_audio_if_uninterruptible": False,
+                "min_duration": 0.7,
+                "min_words": 2,
+                "false_interruption_timeout": 2.0,
+                "resume_false_interruption": True,
+            },
+            # Context changes in on_user_turn_completed invalidate speculative
+            # output, so grounded turns regenerate with the retrieved context.
+            preemptive_generation={"enabled": True},
+        ),
     )
     log("config", "green", field("preemptive_generation", "on", "green"))
 
-    # Production observability: inspect per-stage latency on every turn, then
-    # print aggregate model usage when the session shuts down.
-    usage_collector = metrics.UsageCollector()
-    current_turn: TurnLatency | None = None
-
-    @session.on("metrics_collected")
-    def _on_metrics(ev: MetricsCollectedEvent) -> None:
-        nonlocal current_turn
-
-        _print_metric(ev.metrics)
-        usage_collector.collect(ev.metrics)
-
-        metric = ev.metrics
-        if isinstance(metric, EOUMetrics) and metric.speech_id:
-            # A new committed user turn supersedes any older turn that was
-            # cancelled before producing first audio.
-            current_turn = TurnLatency(
-                speech_id=metric.speech_id,
-                eou_delay=metric.end_of_utterance_delay,
-                transcription_delay=metric.transcription_delay,
-                # This hook is dominated by the Moss query; it also includes
-                # the small amount of context assembly around the query.
-                retrieval_delay=metric.on_user_turn_completed_delay,
-                eou_emitted_at=metric.timestamp,
-            )
-        elif isinstance(metric, LLMMetrics) and metric.speech_id and not metric.cancelled:
-            if current_turn and metric.speech_id == current_turn.speech_id:
-                current_turn.llm_ttft = metric.ttft
-        elif isinstance(metric, TTSMetrics) and metric.speech_id and not metric.cancelled:
-            if current_turn and metric.speech_id == current_turn.speech_id:
-                # A reply can contain multiple TTS segments. The first segment
-                # is the one that contributes to first-audio latency.
-                if current_turn.tts_ttfb is None:
-                    current_turn.tts_ttfb = metric.ttfb
-
-    @session.on("conversation_item_added")
-    def _on_conversation_item_added(ev: ConversationItemAddedEvent) -> None:
-        nonlocal current_turn
-
-        item = ev.item
-        if (
-            current_turn is None
-            or not isinstance(item, ChatMessage)
-            or item.role != "assistant"
-        ):
-            return
-
-        e2e_latency = item.metrics.get("e2e_latency")
-        if e2e_latency is None:
-            return  # initial greeting has no preceding user turn
-
-        started_speaking_at = item.metrics.get("started_speaking_at")
-        if (
-            started_speaking_at is not None
-            and started_speaking_at < current_turn.eou_emitted_at
-        ):
-            return  # late assistant item from a superseded/interrupted turn
-
-        current_turn.total = e2e_latency
-        current_turn.cancelled = item.interrupted
-        current_turn.llm_ttft = item.metrics.get(
-            "llm_node_ttft", current_turn.llm_ttft
-        )
-        current_turn.tts_ttfb = item.metrics.get(
-            "tts_node_ttfb", current_turn.tts_ttfb
-        )
-        _print_turn_latency(current_turn)
-        current_turn = None
-
-    async def _log_session_summary() -> None:
-        summary = usage_collector.get_summary()
-        log(
-            "usage",
-            "cyan",
-            f"{paint('session summary:', 'bold')} "
-            + " ".join(
-                [
-                    field("llm_prompt", str(summary.llm_prompt_tokens)),
-                    field("llm_completion", str(summary.llm_completion_tokens)),
-                    field("stt_audio", f"{summary.stt_audio_duration:.2f}s"),
-                    field("tts_audio", f"{summary.tts_audio_duration:.2f}s"),
-                    field("tts_chars", str(summary.tts_characters_count)),
-                ]
-            ),
-        )
-
-    ctx.add_shutdown_callback(_log_session_summary)
+    # Use current APIs: message-level latency and cumulative usage snapshots.
+    _attach_observability(session, ctx)
 
     await session.start(agent=HeartByteAgent(moss, index_name), room=ctx.room)
 
 
 if __name__ == "__main__":
-    cli.run_app(WorkerOptions(entrypoint_fnc=entrypoint))
+    cli.run_app(server)
