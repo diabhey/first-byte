@@ -77,7 +77,7 @@ This repo is public. `prep/` is gitignored instructor material.
 - Prefer clear, teachable diffs over clever refactors.
 - Keep each section's `agent.py` runnable standalone.
 - `03-grounding-moss`: Exercise 5 is the commented `on_user_turn_completed` in `agent.py` — leave it commented in the shipped tree; students uncomment live.
-- `04-ship-it`: observability is active by default. Students run the complete grounded agent, inspect per-turn metrics and the shutdown usage summary, then deploy the same worker.
+- `04-ship-it`: students enable Agent observability in project settings, deploy, call the agent from the orb, then inspect the session in LiveKit Cloud's Agent insights (Exercise 6). The terminal box, per-reply usage line, and shutdown summary stay active in `agent.py` as the local fallback.
 - Match existing patterns: short instructions, Inference model strings (`deepgram/...`, `openai/...`, `cartesia/...`), Silero VAD, and local audio turn detection via `inference.TurnDetector(version="v1-mini")`. Do not restore the deprecated `MultilingualModel` plugin.
 
 ## Doc sync
@@ -100,7 +100,7 @@ When docs and code disagree, code reality wins; then update the docs.
 ## Testing
 
 - Voice testing: headphones + mic; run `lk agent console sections/<dir>/agent.py` and talk in the terminal. For Ship It, once `livekit.toml` exists, credentials come from `sections/04-ship-it/.env.local`.
-- For metrics and usage verification, use `sections/04-ship-it`; inspect turn timing, cumulative usage updates, and the session summary on shutdown.
+- For metrics and usage verification, use `sections/04-ship-it`: Agent insights for a deployed call, or the console for turn timing, the per-reply usage total, and the session summary on shutdown.
 - Mic-less smoke test (optional): publish synthetic speech into a fresh room with `lk room join --publish`, with these rules:
   - Pad clips with trailing silence so VAD sees end-of-speech.
   - The publisher must be the **first** participant in the room (RoomIO links to the first mic).

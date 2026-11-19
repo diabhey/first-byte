@@ -1,32 +1,30 @@
-# Course Section 2: Hello voice
+# Course Section 2: Hello Voice
 
-Directory 1 of 4: `01-hello-voice`.
+[Course README](../../README.md) · Next: [Production UX →](../02-production-ux/README.md)
 
-## Goal
-
-**Start a voice agent, measure the wait to first audio, then feel the broken baseline.**
+Folder `01-hello-voice`. Start a voice agent, measure the wait, then feel the broken baseline.
 
 ## Run
 
-Complete the [root setup and pre-flight check](../../README.md#pre-class-setup) first. Use LiveKit CLI 2.19.3+ with the same project as `.env`.
+Finish the [pre-class setup](../../README.md#pre-class-setup) first.
 
 ```bash
 lk agent console sections/01-hello-voice/agent.py
 ```
 
-`lk agent console` runs this agent on your machine and connects it to your microphone and speakers. Talk in the terminal. The terminal shows the transcript and the pipeline box. Use headphones. Press `m` to mute, `ctrl+t` to type a turn, `?` for shortcuts, and `q` to quit.
+Talk in the terminal with headphones on. Press `q` to quit.
 
-## Key takeaway
->
-> “This is the standard chained voice pipeline: speech recognition, an LLM, then speech synthesis. We are measuring the wait the user actually feels, not just one model call.”
+The pipeline is [`agent.py`](./agent.py):
 
 ```text
 You speak → Deepgram STT → GPT-4o-mini → Cartesia TTS → you hear audio
 ```
 
-LiveKit Inference supplies STT, LLM, and TTS from the shorthand model names. Silero VAD runs locally in the worker.
+LiveKit Inference runs the three models from their short names. Silero VAD runs on your machine.
 
 ## Read the timing
+
+After each reply the terminal prints one box:
 
 ```text
 END OF TURN (+ transcript …)          … ms
@@ -38,14 +36,16 @@ TTS FIRST BYTE                        … ms
 … ms                          measured pause
 ```
 
-- **End of turn** already includes the time until the final transcript. That note is not a separate stage.
-- **LLM first token** and **TTS first byte** are the two model clocks after the turn is committed.
-- The indented handoff rows are the gaps between those clocks. They are part of the sum, so the sum matches the measured pause.
-- The measured pause is `ChatMessage.metrics["e2e_latency"]`: speech end to the first audio frame. The greeting has no box, because no user turn preceded it.
+- **End of turn** is how long after your sound stopped the agent decided you were done. The transcript time in brackets is already inside it.
+- **LLM first token** and **TTS first byte** are the two model clocks.
+- The indented **handoff** rows are the gaps between those clocks. They are part of the sum.
+- The **measured pause** is speech end to the first audio frame. The sum matches it.
 
-## Feel the broken baseline
+The greeting has no box, because nobody spoke before it.
 
-This worker deliberately sets:
+## Exercises 1–2: feel the broken baseline
+
+This file is wrong on purpose:
 
 ```python
 turn_handling=TurnHandlingOptions(
@@ -55,19 +55,23 @@ turn_handling=TurnHandlingOptions(
 )
 ```
 
-> **Key point:** turn detection decides when the *user* is done; interruption decides when the *agent* stops. They are separate problems.
+Silence ends your turn, and the agent cannot be interrupted. Say each line and note whether it **jumped in** or **waited**:
 
-Try these, and note **jumped in** or **waited**:
+1. “What’s two plus two?” Write down the measured pause.
+2. “Hmm, the thing I want to ask is” and stay silent for 2 seconds.
+3. “What’s the weather”, wait 2 seconds, then “in Lisbon?”
+4. Talk over the agent while it replies.
 
-1. “What’s two plus two?” — record the measured pause.
-2. “Hmm, the thing I want to ask is” — pause silently for **2 seconds**.
-3. “What’s the weather” — pause **2 seconds**, then finish: “in Lisbon?”
-4. Talk over the agent during any reply.
+It will answer mid-thought, and it will ignore you when you talk over it.
 
-The silence-only baseline may reply mid-thought. When you talk over it, it keeps speaking and drops your audio. Quit with `q`, then repeat the same script in [course Section 3](../02-production-ux/README.md).
+> Turn detection decides when *you* are done. Interruption decides when the *agent* stops. They are separate problems.
 
 ## Concepts
 
 - `AgentSession` runs the STT → LLM → TTS pipeline.
-- `Agent` contains instructions and response behavior.
-- `JobContext` is the room handle; `AgentServer` registers the entrypoint with `@server.rtc_session()`; `cli.run_app(server)` starts it.
+- `Agent` holds the instructions.
+- `AgentServer` registers the entrypoint with `@server.rtc_session()`, and `JobContext` is the handle on the room.
+
+---
+
+[Course README](../../README.md) · Next: [Production UX →](../02-production-ux/README.md)

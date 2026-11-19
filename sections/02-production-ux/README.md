@@ -1,38 +1,30 @@
-# Course Section 3: Turn detection that doesn't cut people off
+# Course Section 3: Production UX
 
-Directory 2 of 4: `02-production-ux`.
+[← Hello Voice](../01-hello-voice/README.md) · [Course README](../../README.md) · Next: [Grounding with Moss →](../03-grounding-moss/README.md)
 
-## Goal
-
-**Make the agent wait for a completed thought—and let a real interruption through without treating every sound as one.**
+Folder `02-production-ux`. Make the agent wait for a finished thought, and let a real interruption through.
 
 ## Run
 
-Complete the [root setup and pre-flight check](../../README.md#pre-class-setup) first. Quit the Hello Voice console with `q`, then run:
+Quit Hello Voice with `q`, then:
 
 ```bash
 lk agent console sections/02-production-ux/agent.py
 ```
 
-Talk in the terminal, the same way as Hello Voice. Use headphones. Press `q` to quit before you start the next section.
+The box is the same as [Hello Voice](../01-hello-voice/README.md#read-the-timing).
 
-## Key takeaway
->
-> “Silence is not the same as a finished thought. We need one system to decide when the user is done and another to decide when the agent should stop.”
+## What changed in [`agent.py`](./agent.py)
 
-## What changed
-
-### 1. Semantic end-of-turn detection
+### 1. Semantic end of turn
 
 ```python
-turn_handling=TurnHandlingOptions(
-    turn_detection=inference.TurnDetector(version="v1-mini"),
-)
+turn_detection=inference.TurnDetector(version="v1-mini"),
 ```
 
-The built-in audio model uses spoken meaning and acoustic cues to detect completed turns. `v1-mini` runs locally on CPU, keeping the same model choice in development and Cloud. This replaces the Hello Voice VAD-only baseline; no text turn-detector plugin is needed.
+A local audio model listens to meaning and tone, not just silence. It runs on CPU here and in Cloud.
 
-### 2. Tuned barge-in
+### 2. Tuned interruptions
 
 ```python
 interruption={
@@ -45,10 +37,7 @@ interruption={
 }
 ```
 
-- A real spoken interruption stops the agent.
-- A cough or single “mm-hm” should not.
-- Requiring words trades a little interruption speed for much better robustness.
-- If an apparent interruption produces no transcript, LiveKit resumes the paused reply after `false_interruption_timeout=2.0`.
+A real sentence stops the agent. A cough or a single “mm-hm” should not. If an interruption produces no words, the agent resumes after 2 seconds.
 
 ### 3. Preemptive generation
 
@@ -56,27 +45,27 @@ interruption={
 preemptive_generation={"enabled": True}
 ```
 
-The `interruption` and `preemptive_generation` values are passed inside `TurnHandlingOptions`. LiveKit can start LLM/TTS work from a stable interim transcript before final turn detection. If the user continues, it cancels that speculative work and regenerates from the completed turn.
+The model starts from a stable partial transcript before your turn is final. If you keep talking, that reply is thrown away and generated again.
 
-> **Important:** preemptive generation means the stage clocks can overlap the turn decision. Read the measured pause in the pipeline box. The printed sum includes the handoff gaps, so it matches that pause. Do not add the transcript note on top of end of turn.
+Because the model can start early, the box may show the clocks overlapping. Read the measured pause.
 
-## Test the contrast
+## Exercise 3: run the same script
 
-Repeat the Hello Voice script with the same words and **2-second** pauses:
+Use the same words and 2-second pauses as Hello Voice:
 
 1. Pause after “Hmm, the thing I want to ask is.”
 2. Pause after “What’s the weather,” then add “in Lisbon?”
-3. Speak a full sentence over the agent.
+3. Say a full sentence over the agent.
 4. Say only “mm-hm” while it speaks.
 
-Expected result: it is more likely to wait through unfinished phrases, stop for a full interruption, and continue through a backchannel. Repeat several turns: the model also has endpointing limits and can commit a turn during a long pause. Inspect the observed behavior instead of treating any phrase as a guaranteed test case.
-
-The terminal prints one pipeline box per reply, the same layout as Hello Voice. A cancelled reply is marked on that box. Compare several complete turns with Hello Voice; a median is more useful than one lucky run.
+It should wait through unfinished phrases, stop for a real interruption, and keep going through a backchannel. It is not perfect: a long pause can still end your turn. Compare several turns with Hello Voice, not one lucky run.
 
 ## Concepts
 
-- `inference.TurnDetector(version="v1-mini")` provides local audio-based semantic end-of-turn detection. The older transcript-based `MultilingualModel` plugin is deprecated.
-- `preemptive_generation` overlaps inference with turn detection.
-- Turn detection is about the **user’s** turn; barge-in is about the **agent’s** reply.
+- Turn detection is about **your** turn. Interruption is about the **agent's** reply.
+- `inference.TurnDetector(version="v1-mini")` replaces the deprecated `MultilingualModel` plugin.
+- This agent is read-only, so function tools are out of scope.
 
-This course’s target agent is read-only, so function tools and state-mutating actions are intentionally out of scope.
+---
+
+[← Hello Voice](../01-hello-voice/README.md) · [Course README](../../README.md) · Next: [Grounding with Moss →](../03-grounding-moss/README.md)

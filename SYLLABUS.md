@@ -21,7 +21,7 @@ Every exercise runs against real LiveKit infrastructure. The final deploy comman
 - Build a real-time voice agent on LiveKit Agents using LiveKit Inference, a unified API for STT, LLM, and TTS with no per-provider keys
 - Upgrade from VAD-only silence timeouts to LiveKit's audio-based semantic end-of-turn model so the agent stops cutting people off mid-thought
 - Ground every turn in your own data without breaking the conversational feel. Moss runs semantic search in-process (sub-10 ms), so retrieval fits inside the natural turn-taking pause instead of adding the 300 to 900 ms of dead air a cloud vector database would
-- Instrument the STT → LLM → TTS pipeline with per-turn metrics, then deploy to LiveKit Cloud Agents with a single command
+- Instrument the STT → LLM → TTS pipeline with per-turn metrics, deploy to LiveKit Cloud Agents with a single command, and inspect real calls in the LiveKit Cloud dashboard
 
 ## Who this course is for
 
@@ -40,8 +40,8 @@ Accounts, both free:
 
 Local environment:
 
-- Python 3.13 recommended (supported range 3.11–3.14), [uv](https://docs.astral.sh/uv/) for dependency management, and the [LiveKit CLI](https://docs.livekit.io/home/cli/)
-- A supported Moss environment: macOS 14+ on Apple Silicon, Linux x86_64/ARM64, or Windows x64. Intel Macs need a prepared Linux environment; see the README
+- Python 3.13 recommended (supported range 3.11–3.14), [uv](https://docs.astral.sh/uv/) for dependency management, and the [LiveKit CLI](https://docs.livekit.io/intro/basics/cli/)
+- A supported Moss environment: macOS 14+ on Apple Silicon, Linux x86_64/ARM64, or Windows x64. Intel Macs need a prepared Linux environment; see the [README](./README.md#1-tools)
 - Headphones with a microphone. Laptop speakers plus a built-in mic cause audio feedback that makes voice testing unusable
 - A recent browser for the deployed orb at the end of class, a code editor, and stable broadband — a wired connection is recommended for the live session
 
@@ -58,7 +58,7 @@ Five sections, a five-minute break, and a five-minute wrap-up total exactly two 
 
 ### Section 2: Your first voice agent (30 min)
 
-Code: `sections/01-hello-voice/`
+Code: [`sections/01-hello-voice`](./sections/01-hello-voice/README.md)
 
 - **Presentation (10 min).** LiveKit Agents fundamentals: `Agent`, `AgentSession`, `JobContext`, `AgentServer`, the session entrypoint pattern, and how LiveKit Inference unifies STT, LLM, and TTS behind shorthand model strings.
 - **Exercise 1 (10 min).** Boot the local agent and have your first voice conversation in the terminal. Speak to the agent, and inspect the trace: Silero VAD, Deepgram nova-3, GPT-4o-mini, Cartesia sonic-3.
@@ -67,7 +67,7 @@ Code: `sections/01-hello-voice/`
 
 ### Section 3: Turn detection that doesn't cut people off (15 min)
 
-Code: `sections/02-production-ux/`
+Code: [`sections/02-production-ux`](./sections/02-production-ux/README.md)
 
 - **Presentation (5 min).** Why VAD-only silence timeouts are wrong for voice: the difference between "they stopped making sound" and "they finished their thought," LiveKit's audio-based semantic end-of-turn model, and why this single change is the difference between an agent that feels rude and one that feels human.
 - **Exercise 3 (8 min).** Upgrade to semantic turn detection. Test phrases with natural pauses, compare side by side against VAD-only behaviour, and watch the agent wait instead of barging in.
@@ -77,7 +77,7 @@ Code: `sections/02-production-ux/`
 
 ### Section 4: Grounding agents in real data with Moss (30 min)
 
-Code: `sections/03-grounding-moss/`
+Code: [`sections/03-grounding-moss`](./sections/03-grounding-moss/README.md)
 
 - **Presentation (5 min).** Why voice agents need retrieval: why retrieve-as-tool patterns add an extra LLM round-trip you can't afford in voice, how hosted vector databases add 300 to 900 ms of dead air per turn against Moss's claimed sub-10 ms p99 in-process with zero network hops, and the principle of retrieving always and letting the LLM decide what to use.
 - **Exercise 4 (10 min).** Build a Moss index for the HeartByte orb. Install the Moss SDK, build the index from the shipped knowledge base, query it directly, and inspect scores while tuning alpha and top-k.
@@ -86,11 +86,11 @@ Code: `sections/03-grounding-moss/`
 
 ### Section 5: Observability and deployment (20 min)
 
-Code: `sections/04-ship-it/`
+Code: [`sections/04-ship-it`](./sections/04-ship-it/README.md)
 
-- **Presentation (5 min).** Observability for voice agents: the per-turn latency breakdown across STT first byte, LLM time-to-first-token, and TTS first audio chunk; session-level usage rollups; and the principle of observability *before* deploy, not after.
-- **Exercise 6 (7 min).** Inspect the shipped observability handlers in the complete grounded agent. Read per-turn latency from `ChatMessage.metrics`, watch cumulative usage updates, and inspect the shutdown summary. Trace how the event handlers and shutdown callback produce the output.
+- **Presentation (5 min).** Observability for voice agents: the per-turn latency breakdown across STT first byte, LLM time-to-first-token, and TTS first audio chunk; session-level usage rollups; and turning on agent observability *before* the first real call, not after.
 - **Live walkthrough (5 min).** Deploy with one command. It builds, ships, and registers your agent on LiveKit Cloud's global infrastructure; the section directory is pre-staged as a self-contained deployable project with locked dependencies and model downloads performed during the image build. Rehearse the build before class; a first build can exceed the live demo window. Then serve the included orb page locally, paste in a LiveKit token, and tap the orb to talk to your cloud-deployed agent end to end — the same three pieces you need in production: a static page, LiveKit Cloud, and an agent worker.
+- **Exercise 6 (7 min).** Inspect the call in LiveKit Cloud's Agent insights: per-turn latency, the traces for each pipeline stage, token and speech usage, session logs, and the recording, all on one timeline. Find the slowest turn and the stage that cost the most, and see how retrieval grows the prompt. The same worker prints the per-turn breakdown and usage in the terminal as a local fallback.
 - **Going further (3 min).** Wiring the visitor-facing half on Cloudflare Pages with per-visitor tokens minted server-side; the three security layers a public voice page needs (origin checks on the token endpoint, per-visitor room names, and edge rate limiting); the audio-reactive UI state machine driven from analyser taps on both microphone and agent audio; multi-agent handoffs; telephony over SIP; vision-enabled realtime models; photoreal avatars; and self-hosting LiveKit Server.
 
 ### Wrap-up and final Q&A (5 min)

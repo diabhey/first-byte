@@ -2,59 +2,45 @@
 
 Course repo for **Production Voice AI Agents with LiveKit** by [Abhimanyu Selvan](https://diabhey.com).
 
-The name comes from a key voice-AI metric: TTS time-to-first-byte. Rather than chase a single headline number, the course measures the whole speech-end-to-first-audio path and breaks it down by stage — turn detection, transcription, retrieval, LLM time-to-first-token, and TTS TTFB — so you can see which one costs you the wait.
+The name comes from TTS time-to-first-byte. The course measures the whole wait, from the moment you stop speaking to the first audio back, and shows which stage spent it.
 
-[`SYLLABUS.md`](./SYLLABUS.md) covers what the course teaches and how the two hours are structured. This README covers setup and the commands you run.
+[`SYLLABUS.md`](./SYLLABUS.md) covers what the course teaches. This README covers setup and the commands you run.
 
-## Layout
+## Sections
 
-```bash
-first-byte/
-├── pyproject.toml          # uv-managed deps for every section
-├── SYLLABUS.md             # Course description, objectives, and schedule
-├── AGENTS.md               # Instructions for coding agents working on this repo
-├── .env.example            # Template for credentials
-├── preflight.py            # Verifies your setup before class
-├── sections/
-│   ├── 01-hello-voice/     # First voice agent on LiveKit Inference
-│   ├── 02-production-ux/   # Semantic turn detection
-│   ├── 03-grounding-moss/  # RAG via on_user_turn_completed
-│   └── 04-ship-it/         # Observability + lk agent create deploy
-└── orb/                    # Visitor-facing webpage (Three.js orb, LiveKit JS SDK).
-                            # Run locally to talk to your deployed agent.
-```
+Course Section 1 is the talk and demo. It has no code, so the folders are numbered one lower.
 
-The four directories map to course sections 2 through 5 (course Section 1 is the presentation and live demo, no code): `01-hello-voice` is course Section 2, `02-production-ux` is course Section 3, `03-grounding-moss` is course Section 4, and `04-ship-it` is course Section 5. Each section README states both its course section and directory order.
+| Course section | Folder | What you build |
+| --- | --- | --- |
+| 2 | [`01-hello-voice`](./sections/01-hello-voice/README.md) | A first voice agent, and the measured wait |
+| 3 | [`02-production-ux`](./sections/02-production-ux/README.md) | Semantic turn detection and tuned interruptions |
+| 4 | [`03-grounding-moss`](./sections/03-grounding-moss/README.md) | Moss retrieval on every spoken turn |
+| 5 | [`04-ship-it`](./sections/04-ship-it/README.md) | A LiveKit Cloud deploy, inspected in the dashboard |
 
-Each `sections/` directory has one self-contained `agent.py` you run with `lk agent console sections/<dir>/agent.py`. They build on each other, but each is also runnable standalone. In `03-grounding-moss`, Exercise 5 is the commented `on_user_turn_completed` hook (uncomment to enable RAG). In `04-ship-it`, observability is already enabled: run it, inspect the per-turn metrics and shutdown usage summary, then deploy that same worker.
+Each folder has one standalone `agent.py`. The [`orb`](./orb/README.md) is the browser page you use to call the deployed agent at the end.
 
-Exercise numbering follows the course listing: Exercises 1–2 (Section 2), Exercise 3 (Section 3), Exercises 4–5 (Section 4), and Exercise 6 (Section 5). This course builds a read-only agent.
-
-The `orb/` directory is the browser client. After deployment, serve it locally with `python3 -m http.server 8000 --bind 127.0.0.1`. See `orb/README.md`.
+Exercises follow the course listing: 1–2 in Section 2, 3 in Section 3, 4–5 in Section 4, and 6 in Section 5.
 
 ## Pre-class setup
 
-Complete this **before** the live session. Budget 30 to 40 minutes.
+Do this before the live session. Budget 30 to 40 minutes.
 
 ### 1. Tools
 
-Install:
-
-- Python 3.13 recommended (supported project range: 3.11–3.14)
+- Python 3.13 (3.11–3.14 works)
 - [uv](https://docs.astral.sh/uv/): `curl -LsSf https://astral.sh/uv/install.sh | sh`
-- LiveKit CLI **2.19.3 or newer** (`lk --version`):
-  - macOS: `brew install livekit-cli`; existing installations: `brew update` then `brew upgrade livekit-cli`
+- [LiveKit CLI](https://docs.livekit.io/intro/basics/cli/) 2.19.3 or newer (`lk --version`)
+  - macOS: `brew install livekit-cli`, or `brew update && brew upgrade livekit-cli`
   - Linux: `curl -sSL https://get.livekit.io/cli | bash`
   - Windows: `winget install LiveKit.LiveKitCLI`
+- Headphones with a microphone. Laptop speakers and a built-in mic feed back into each other.
 
-Moss includes a native library. Use macOS 14 or newer on Apple Silicon, Linux (x86_64 or ARM64, glibc 2.28+), or Windows x64; the Linux deployment image is Debian Trixie. Intel Mac users should prepare a Linux environment before class and confirm microphone/browser connectivity during rehearsal. Docker Desktop on an Intel Mac can run the deployment image; on Apple Silicon, use `--platform linux/amd64` when checking that image.
-
-You'll also want **headphones with a microphone** for the live session. Laptop speakers plus the built-in mic cause audio feedback that makes voice testing unusable.
+Moss ships a native library. Use macOS 14+ on Apple Silicon, Linux (x86_64 or ARM64, glibc 2.28+), or Windows x64. On an Intel Mac, prepare a Linux environment before class.
 
 ### 2. Accounts
 
-- **LiveKit Cloud**: sign up for the Build plan (free, no credit card required) at [cloud.livekit.io](https://cloud.livekit.io). It covers STT, LLM, and TTS via LiveKit Inference, so no separate provider keys are needed. After signup, run `lk cloud auth` once to link the CLI.
-- **Moss**: sign up at [moss.dev](https://moss.dev) (free tier is enough), create a project, copy the project ID and project key, and choose a unique lowercase index name. Any name works; `firstbyte-yourname` is a handy convention that also skips the extra confirmation prompt if you ever rebuild the index with `--replace`.
+- **LiveKit Cloud**: the free Build plan at [cloud.livekit.io](https://cloud.livekit.io). LiveKit Inference covers STT, LLM, and TTS, so you need no provider keys. Run `lk cloud auth` once.
+- **Moss**: the free tier at [moss.dev](https://moss.dev). Copy the project ID and key, and pick a lowercase index name such as `firstbyte-yourname`.
 
 ### 3. Repo
 
@@ -67,13 +53,13 @@ uv python install 3.13
 uv sync --locked --python 3.13
 ```
 
-### 4. Download model files before class
+### 4. Model files
 
 ```bash
 uv run -m livekit.agents download-files
 ```
 
-This prepares SDK/plugin assets before the live session. The local `v1-mini` turn model is bundled in `livekit-local-inference`, while Silero provides its VAD model with the plugin. Allow time and disk space for installation and model initialization. Do this again after a dependency update.
+Run this again after a dependency update.
 
 ### 5. Pre-flight check
 
@@ -81,61 +67,42 @@ This prepares SDK/plugin assets before the live session. The local `v1-mini` tur
 uv run python preflight.py
 ```
 
-This checks Python, the LiveKit CLI, credentials, required packages, that `livekit-agents` is at least 1.8.11, and authenticated read requests to LiveKit and Moss. Keep secrets in `.env` or export the same variables in your shell. All checks must pass before class. `uv run python preflight.py --offline` checks local setup without contacting those services; it does not prove authentication, model availability, audio, or deployment.
+[`preflight.py`](./preflight.py) checks Python, the CLI, your credentials, the installed packages, and live access to LiveKit and Moss. Every check must pass. `--offline` skips the network checks.
 
-Build your Moss index in course Section 4, following its [README](./sections/03-grounding-moss/README.md). Preflight verifies account access. Speak to the agent, and finish a Cloud deployment, before you rely on either one in class.
+Build your Moss index before class. The steps are in [Grounding with Moss](./sections/03-grounding-moss/README.md#build-the-index).
 
 ## Running an agent
 
 ```bash
-# Course Section 2
 lk agent console sections/01-hello-voice/agent.py
-
-# Course Section 3
 lk agent console sections/02-production-ux/agent.py
-
-# Course Section 4
 lk agent console sections/03-grounding-moss/agent.py
-
-# Course Section 5
 lk agent console sections/04-ship-it/agent.py
 ```
 
-`lk agent console` runs that agent on your machine and connects it to your microphone and speakers. You talk in the terminal. The terminal shows the live transcript and latency. Use headphones. Press `m` to mute, `ctrl+t` to type a turn, `?` for shortcuts, and `q` to quit. Stop the current console before you start the next section.
+The console runs the agent on your machine with your microphone and speakers. Talk in the terminal. Press `m` to mute, `ctrl+t` to type, `?` for shortcuts, and `q` to quit. Quit one section before you start the next.
 
-Sections 2 through 4 read the repo-root `.env`. After Section 5 is deployed, `sections/04-ship-it/livekit.toml` makes that directory its own project, and the console reads `sections/04-ship-it/.env.local` instead. Copy the same `LIVEKIT_*` and `MOSS_*` values there. The [Ship It README](./sections/04-ship-it/README.md) has the step.
+Sections 2 to 4 read the repo-root `.env`. Once Ship It has a `livekit.toml`, its console reads `sections/04-ship-it/.env.local` instead. [Ship It](./sections/04-ship-it/README.md#local-fallback) has the step.
 
 ## Deploying
 
-In Section 5 (`sections/04-ship-it/`) you'll deploy the final agent to LiveKit Cloud Agents:
+Course Section 5 deploys the final agent to LiveKit Cloud. The commands are in [Ship It](./sections/04-ship-it/README.md#2-deploy). Then call it from the [orb](./orb/README.md) and [inspect the call](./sections/04-ship-it/README.md#4-inspect-the-call) in the dashboard.
 
-```bash
-lk cloud auth
-lk project list
-lk project set-default "<your-course-project-name>"
-cd sections/04-ship-it
-lk agent create --secrets-file=../../.env
-lk agent secrets
-lk agent status
-```
+## Dependency baseline
 
-`lk agent create` builds, ships, and registers your agent worker on LiveKit's global network and securely injects the `MOSS_*` values from the repo-root `.env`. LiveKit ignores the project credentials it supplies automatically. The CLI writes your new agent ID and project to the gitignored `livekit.toml`. Follow [`orb/README.md`](./orb/README.md) to test the deployed agent. Subsequent updates use `lk agent deploy`. That command cannot restore a deleted agent ID. The rebuild steps are in the [Ship It README](./sections/04-ship-it/README.md).
-
-## Validated dependency baseline
-
-The course uses LiveKit Agents and Silero **1.8.11**, with matching versions in both committed lockfiles. Semantic turn detection uses the SDK’s local audio model, `inference.TurnDetector(version="v1-mini")`; the deprecated text turn-detector plugin is no longer needed. The examples use `AgentServer`, `TurnHandlingOptions`, `conversation_item_added`, and `session_usage_updated`. Install from the locks for class. After a dependency upgrade, repeat the voice and deployment checks.
+LiveKit Agents and Silero **1.8.11**, pinned in both lockfiles. Turn detection uses the SDK's local audio model, `inference.TurnDetector(version="v1-mini")`. After an upgrade, repeat the voice and deploy checks.
 
 ## Resources
 
-- [O'Reilly live event: Production Voice AI Agents with LiveKit](https://www.oreilly.com/live-events/production-voice-ai-agents-with-livekit/0642572366988/)
+- [O'Reilly live event](https://www.oreilly.com/live-events/production-voice-ai-agents-with-livekit/0642572366988/)
 - [LiveKit Agents docs](https://docs.livekit.io/agents/)
-- [LiveKit Inference catalog](https://docs.livekit.io/agents/models/inference/)
-- [LiveKit Voice AI Quickstart](https://docs.livekit.io/agents/start/voice-ai/)
-- [LiveKit Agents Python SDK and examples](https://github.com/livekit/agents)
-- [LiveKit Cloud Agents deployment](https://docs.livekit.io/deploy/agents/)
-- [LiveKit JS Client SDK](https://docs.livekit.io/reference/client-sdk-js/) (visitor-facing frontend)
-- [`lk agent console`](https://docs.livekit.io/reference/developer-tools/livekit-cli/agent/)
+- [LiveKit Inference models](https://docs.livekit.io/agents/models/inference/)
+- [LiveKit Voice AI quickstart](https://docs.livekit.io/agents/start/voice-ai/)
+- [LiveKit Agents Python SDK](https://github.com/livekit/agents)
+- [Deploying agents to LiveKit Cloud](https://docs.livekit.io/deploy/agents/)
+- [LiveKit JS client SDK](https://docs.livekit.io/reference/client-sdk-js/)
+- [`lk agent` commands](https://docs.livekit.io/reference/developer-tools/livekit-cli/agent/)
 - [Moss docs](https://docs.moss.dev/docs)
 - [ArchByte architecture visualization](https://diabhey.com/tools/archbyte)
-- [`SYLLABUS.md`](./SYLLABUS.md) — course description, objectives, and schedule
-- [`AGENTS.md`](./AGENTS.md) — guidance for coding agents editing this repo
+- [`SYLLABUS.md`](./SYLLABUS.md): course outline and schedule
+- [`AGENTS.md`](./AGENTS.md): notes for coding agents editing this repo

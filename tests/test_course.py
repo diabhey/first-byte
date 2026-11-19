@@ -260,18 +260,19 @@ class ObservabilityTests(unittest.IsolatedAsyncioTestCase):
             callbacks["conversation_item_added"](ConversationItemAddedEvent(item=ChatMessage(
                 role="user", content=["Hello"], metrics={
                     "end_of_turn_delay": .3, "transcription_delay": .1})))
+            for _ in range(3):
+                callbacks["session_usage_updated"](SessionUsageUpdatedEvent(usage=session.usage))
             callbacks["conversation_item_added"](ConversationItemAddedEvent(item=ChatMessage(
                 role="assistant", content=["Hello"], metrics={"e2e_latency": .8,
                 "llm_node_ttft": .2, "tts_node_ttfb": .1})))
-            for _ in range(2):
-                callbacks["session_usage_updated"](SessionUsageUpdatedEvent(usage=session.usage))
             await shutdown[0]()
         text = output.getvalue()
         self.assertIn("END OF TURN (+ transcript 100 ms)", text)
         self.assertIn("800 ms", text)
         self.assertIn("handoffs between clocks", text)
+        self.assertIn("running total:", text)
         self.assertIn("session summary:", text)
-        self.assertEqual(text.count("llm_prompt=100"), 3)
+        self.assertEqual(text.count("llm_prompt=100"), 2)
         self.assertNotIn("llm_prompt=200", text)
 
 

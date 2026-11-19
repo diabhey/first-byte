@@ -1,9 +1,9 @@
 """
 Section 4: Ship it.
 
-The tested Section 3 grounded agent, with production observability enabled and
-ready for deployment. Run it locally, inspect per-turn latency and cumulative
-session usage, then deploy the same worker with `lk agent create`.
+The tested Section 3 grounded agent, ready for deployment. Deploy it with
+`lk agent create`, call it, and inspect the session in LiveKit Cloud's Agent
+insights. Locally, the console prints per-turn latency and usage instead.
 
 Run locally:
     lk agent console sections/04-ship-it/agent.py
@@ -18,6 +18,7 @@ Deploy to LiveKit Cloud Agents:
 
 import os
 import sys
+from collections.abc import Callable
 
 from dotenv import load_dotenv
 from livekit.agents import (
@@ -355,7 +356,7 @@ def _print_pipeline_box(
     print("\n" + "\n".join(lines) + "\n", flush=True)
 
 
-def _attach_timing_logs(session: AgentSession) -> None:
+def _attach_timing_logs(session: AgentSession, after_box: Callable[[], None]) -> None:
     """Hold the user half of a turn until the reply arrives, then print one box."""
     pending_user: dict | None = None
 
@@ -390,15 +391,25 @@ def _attach_timing_logs(session: AgentSession) -> None:
             pending_user["retrieval"],
             interrupted=bool(item.interrupted),
         )
+        after_box()
         pending_user = None
+
 
 def _attach_observability(session: AgentSession, ctx: JobContext) -> None:
     """Observe the pipeline box, cumulative model usage, and final usage."""
-    _attach_timing_logs(session)
+    latest: list[AgentSessionUsage] = []
 
+    def _print_running_total() -> None:
+        if latest:
+            _print_usage(latest[-1], "running total")
+
+    _attach_timing_logs(session, after_box=_print_running_total)
+
+    # Fires on every counter change, STT included, so keep the newest
+    # snapshot and print it once per reply instead.
     @session.on("session_usage_updated")
     def _on_session_usage_updated(ev: SessionUsageUpdatedEvent) -> None:
-        _print_usage(ev.usage, "cumulative")
+        latest[:] = [ev.usage]
 
     async def _log_session_summary() -> None:
         _print_usage(session.usage, "session summary")
