@@ -1,4 +1,6 @@
-# Section 3: Grounding with Moss
+# Course Section 4: Grounding with Moss
+
+Directory 3 of 4: `03-grounding-moss`.
 
 ## Goal
 
@@ -49,17 +51,14 @@ Moss setup and index preloading already exist in [`agent.py`](./agent.py). The `
 1. Run the ungrounded baseline:
 
    ```bash
-   uv run python sections/03-grounding-moss/agent.py dev
+   lk agent console sections/03-grounding-moss/agent.py
    ```
 
-2. Ask “Who’s Abhi?” The agent has no injected knowledge-base context, so it should say it does not have that information.
-3. Stop the worker. Uncomment the complete `on_user_turn_completed` block (`Cmd + /` on macOS; `Ctrl + /` elsewhere).
-4. Restart, ask the same question, and watch for `[moss] injected N results`.
+2. Speak “Who’s Abhi?” A typed turn (`ctrl+t`) does not run `on_user_turn_completed`, so Moss never searches. The agent has no injected knowledge-base context, so it should say it does not have that information.
+3. Quit with `q`. Uncomment the complete `on_user_turn_completed` block (`Cmd + /` on macOS; `Ctrl + /` elsewhere).
+4. Run the same command again, ask the same question, and watch for `[moss] injected N results`.
 
-```text
-[timing] Moss retrieval: ...
-[latency] perceived=...ms ... retrieval=...ms
-```
+The pipeline box matches the earlier sections. When the hook runs, Moss time appears as a note on the handoff row. It is already inside that gap, so it is not added again. Watch for `[moss] injected N results`.
 
 > **Important:** index preloading does not ground an answer. The hook must query Moss and add its results to the temporary `turn_ctx`.
 
@@ -78,7 +77,7 @@ The prompt treats retrieved content as reference data, not instructions. Includi
 
 This section carries forward semantic turn detection, barge-in tuning, and preemptive generation.
 
-- Component timings may overlap; compare the separately measured `perceived` latency before and after grounding.
+- Compare the measured pause in the pipeline box before and after grounding. The transcript note and the Moss note are already inside other rows.
 - Changing `turn_ctx` with the retrieval results invalidates speculative ungrounded output, so LiveKit regenerates the answer with the context. That preserves grounding but may spend extra inference.
 
 ## Concepts

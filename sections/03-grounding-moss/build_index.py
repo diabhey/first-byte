@@ -73,26 +73,26 @@ async def main(*, replace: bool = False) -> None:
         for d in raw_docs
     ]
 
-    client = MossClient(project_id=project_id, project_key=project_key)
+    async with MossClient(project_id=project_id, project_key=project_key) as client:
+        existing_indexes = await client.list_indexes()
+        index_exists = any(index.name == index_name for index in existing_indexes)
+        if index_exists and not replace:
+            raise RuntimeError(
+                f"Index '{index_name}' already exists. Re-run with --replace "
+                "only if you intend to delete and recreate it."
+            )
+        if index_exists:
+            confirm_replace(index_name)
+            await client.delete_index(index_name)
+            print(f"Deleted existing index '{index_name}'")
 
-    existing_indexes = await client.list_indexes()
-    index_exists = any(index.name == index_name for index in existing_indexes)
-    if index_exists and not replace:
-        raise RuntimeError(
-            f"Index '{index_name}' already exists. Re-run with --replace "
-            "only if you intend to delete and recreate it."
+        print(f"Creating index '{index_name}' with {len(docs)} documents...")
+        # wait=True returns only once the index can be loaded and queried.
+        result = await client.create_index(index_name, docs, model_id="moss-minilm", wait=True)
+        print(
+            f"Done: job={result.job_id}, index={result.index_name}, "
+            f"docs={result.doc_count}"
         )
-    if index_exists:
-        confirm_replace(index_name)
-        await client.delete_index(index_name)
-        print(f"Deleted existing index '{index_name}'")
-
-    print(f"Creating index '{index_name}' with {len(docs)} documents...")
-    result = await client.create_index(index_name, docs, model_id="moss-minilm")
-    print(
-        f"Done: job={result.job_id}, index={result.index_name}, "
-        f"docs={result.doc_count}"
-    )
 
 
 if __name__ == "__main__":

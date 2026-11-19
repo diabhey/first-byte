@@ -38,9 +38,11 @@ htmlcov/
 .claude-logs/
 .claude/settings.local.json
 
-# Instructor-only prep material (this repo is public and student-facing)
+# Instructor-only prep material (this repo is public and student-facing).
+# Spoken script and delivery checklist live in prep/ and must stay untracked.
 prep/
 .abhi/
+/COURSE_READINESS.md
 
 # OS
 .DS_Store
@@ -53,3 +55,5 @@ orb/config.js
 # Per-student `lk agent create` output. Each student generates their own
 # with their project subdomain + agent ID; the .example file is committed.
 sections/04-ship-it/livekit.toml
+sections/04-ship-it/livekit.toml.*
+!sections/04-ship-it/livekit.toml.example

@@ -1,4 +1,6 @@
-# Section 1: Hello voice
+# Course Section 2: Hello voice
+
+Directory 1 of 4: `01-hello-voice`.
 
 ## Goal
 
@@ -6,13 +8,13 @@
 
 ## Run
 
-Complete the [root setup and pre-flight check](../../README.md#pre-class-setup) first. Use the same LiveKit Cloud project in the Playground as the one configured in `.env`, and stop any other local workers.
+Complete the [root setup and pre-flight check](../../README.md#pre-class-setup) first. Use LiveKit CLI 2.19.3+ with the same project as `.env`.
 
 ```bash
-uv run python sections/01-hello-voice/agent.py dev
+lk agent console sections/01-hello-voice/agent.py
 ```
 
-Open [Agents Playground](https://agents-playground.livekit.io), connect, and keep the terminal visible. Use headphones.
+`lk agent console` runs this agent on your machine and connects it to your microphone and speakers. Talk in the terminal. The terminal shows the transcript and the pipeline box. Use headphones. Press `m` to mute, `ctrl+t` to type a turn, `?` for shortcuts, and `q` to quit.
 
 ## Key takeaway
 >
@@ -27,40 +29,45 @@ LiveKit Inference supplies STT, LLM, and TTS from the shorthand model names. Sil
 ## Read the timing
 
 ```text
-[timing] end-of-utterance delay: ...
-[timing] transcription delay:    ...
-[timing] LLM TTFT (first token): ...
-[timing] TTS TTFB (first byte):  ...
-[timing] TOTAL end-to-end:       ...ms
+END OF TURN (+ transcript …)          … ms
+LLM FIRST TOKEN                       … ms
+    └ handoff to TTS                      … ms
+TTS FIRST BYTE                        … ms
+    └ handoffs between clocks             … ms
+… + … + … = … ms
+… ms                          measured pause
 ```
 
-- **TTFT** is when the LLM starts responding.
-- **TTFB** is when TTS returns its first audio chunk.
-- **`TOTAL`** is this agent's speech-end → first-audio estimate: EOU delay + LLM TTFT + first TTS TTFB. Do not add transcription delay too; it overlaps the EOU window.
-- The greeting has no `TOTAL`, because no user turn preceded it.
+- **End of turn** already includes the time until the final transcript. That note is not a separate stage.
+- **LLM first token** and **TTS first byte** are the two model clocks after the turn is committed.
+- The indented handoff rows are the gaps between those clocks. They are part of the sum, so the sum matches the measured pause.
+- The measured pause is `ChatMessage.metrics["e2e_latency"]`: speech end to the first audio frame. The greeting has no box, because no user turn preceded it.
 
 ## Feel the broken baseline
 
 This worker deliberately sets:
 
 ```python
-allow_interruptions=False
-discard_audio_if_uninterruptible=True
+turn_handling=TurnHandlingOptions(
+    turn_detection="vad",
+    interruption={"enabled": False, "discard_audio_if_uninterruptible": True},
+    preemptive_generation={"enabled": False},
+)
 ```
 
 > **Key point:** turn detection decides when the *user* is done; interruption decides when the *agent* stops. They are separate problems.
 
 Try these, and note **jumped in** or **waited**:
 
-1. “What’s two plus two?” — record the `TOTAL`.
+1. “What’s two plus two?” — record the measured pause.
 2. “Hmm, the thing I want to ask is” — pause silently for **2 seconds**.
 3. “What’s the weather” — pause **2 seconds**, then finish: “in Lisbon?”
 4. Talk over the agent during any reply.
 
-The silence-only baseline may reply mid-thought. When you talk over it, it keeps speaking and drops your audio. Stop it with `Ctrl+C`, then repeat the same script in [Section 2](../02-production-ux/README.md).
+The silence-only baseline may reply mid-thought. When you talk over it, it keeps speaking and drops your audio. Quit with `q`, then repeat the same script in [course Section 3](../02-production-ux/README.md).
 
 ## Concepts
 
 - `AgentSession` runs the STT → LLM → TTS pipeline.
 - `Agent` contains instructions and response behavior.
-- `JobContext` is the room handle; `WorkerOptions` registers the worker entrypoint.
+- `JobContext` is the room handle; `AgentServer` registers the entrypoint with `@server.rtc_session()`; `cli.run_app(server)` starts it.

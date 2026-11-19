@@ -1,0 +1,14 @@
+---
+description: Keep the instructor course-readiness checklist out of the public repo
+alwaysApply: true
+---
+
+# Private course readiness
+
+`COURSE_READINESS.md` is instructor-only. This repository is public and student-facing.
+
+- The working copy is `prep/COURSE_READINESS.md`. `prep/` is gitignored. A root copy is gitignored too, and is the wrong place to leave it.
+- The spoken script is `prep/spoken-script.md`. Never stage, commit, or push `prep/`, and do not recreate `TEACHING_GUIDE.md` in the public tree.
+- Never link instructor notes from `README.md`, section READMEs, or `SYLLABUS.md`.
+- Before any push, `git ls-files COURSE_READINESS.md TEACHING_GUIDE.md prep` must print nothing. If a copy is at the repo root, move it into `prep/` before staging anything else.
+- Student-facing steps for a deleted Cloud agent belong in `sections/04-ship-it/README.md`.
