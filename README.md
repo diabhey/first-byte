@@ -127,15 +127,15 @@ The course uses LiveKit Agents and Silero **1.8.11**, with matching versions in 
 
 ## Resources
 
-- [O'Reilly live event: Production Voice AI Agents with LiveKit](https://learning.oreilly.com/live-events/production-voice-ai-agents-with-livekit/0642572366988/)
+- [O'Reilly live event: Production Voice AI Agents with LiveKit](https://www.oreilly.com/live-events/production-voice-ai-agents-with-livekit/0642572366988/)
 - [LiveKit Agents docs](https://docs.livekit.io/agents/)
 - [LiveKit Inference catalog](https://docs.livekit.io/agents/models/inference/)
-- [LiveKit Voice AI Quickstart](https://docs.livekit.io/agents/start/voice-ai-quickstart/)
+- [LiveKit Voice AI Quickstart](https://docs.livekit.io/agents/start/voice-ai/)
 - [LiveKit Agents Python SDK and examples](https://github.com/livekit/agents)
 - [LiveKit Cloud Agents deployment](https://docs.livekit.io/deploy/agents/)
 - [LiveKit JS Client SDK](https://docs.livekit.io/reference/client-sdk-js/) (visitor-facing frontend)
 - [`lk agent console`](https://docs.livekit.io/reference/developer-tools/livekit-cli/agent/)
-- [Moss docs](https://docs.moss.dev)
-- [ArchByte architecture visualization](https://archbyte.heartbyte.io/)
+- [Moss docs](https://docs.moss.dev/docs)
+- [ArchByte architecture visualization](https://diabhey.com/tools/archbyte)
 - [`SYLLABUS.md`](./SYLLABUS.md) — course description, objectives, and schedule
 - [`AGENTS.md`](./AGENTS.md) — guidance for coding agents editing this repo
