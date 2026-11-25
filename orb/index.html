@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <title>HeartByte — Voice Agent Orb</title>
-  <meta name="description" content="A local voice client that talks to your deployed HeartByte agent on LiveKit Cloud. Built for the Production Voice AI Agents with LiveKit course." />
+  <title>First Byte — Course Voice Demo</title>
+  <meta name="description" content="A local browser demo for the Production Voice AI Agents with LiveKit course. It connects to your deployed course agent on LiveKit Cloud." />
   <meta name="theme-color" content="#f4efe5" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -150,6 +150,9 @@
       .mark-dot { animation: none; }
       .state-anchor, .anchor-rule { transition: none; }
     }
+    html[data-render-mode="static"] .mark-dot { animation: none; }
+    html[data-render-mode="static"] .state-anchor,
+    html[data-render-mode="static"] .anchor-rule { transition: none; }
   </style>
 </head>
 <body>
@@ -159,12 +162,12 @@
     <header>
       <div class="mark">
         <span class="mark-dot" aria-hidden="true"></span>
-        <span>HeartByte</span>
+        <span>First Byte</span>
       </div>
     </header>
 
     <main>
-      <button class="orb-tap" id="orbButton" aria-label="Tap to talk with the HeartByte agent"></button>
+      <button class="orb-tap" id="orbButton" aria-label="Tap to talk with the course voice agent"></button>
       <div class="state-anchor" id="stateAnchor" data-state="idle">
         <span class="anchor-rule" aria-hidden="true"></span>
         <span class="state-label" id="topStatus" aria-live="polite">tap to talk</span>
@@ -173,13 +176,13 @@
     </main>
 
     <footer>
-      <div class="tagline">single-origin</div>
+      <div class="tagline">course voice demo</div>
       <a class="byline" href="https://github.com/diabhey/first-byte" rel="me">first-byte course</a>
     </footer>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/livekit-client@2.23.0/dist/livekit-client.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/livekit-client@2.24.0/dist/livekit-client.umd.min.js"></script>
   <script src="config.js"></script>
   <script>
   (() => {
@@ -190,6 +193,18 @@
     const topStatus   = document.getElementById('topStatus');
     const stateAnchor = document.getElementById('stateAnchor');
     const canvas      = document.getElementById('orb');
+    let staticFrame   = null;
+
+    // `?low-power=1` is useful on constrained laptops and while screen sharing.
+    // The OS/browser reduced-motion preference selects the same static renderer.
+    const motionPreference = window.matchMedia?.('(prefers-reduced-motion: reduce)');
+    const lowPowerMode = Boolean(
+      motionPreference?.matches
+      || new URLSearchParams(window.location.search).get('low-power') === '1'
+    );
+    document.documentElement.setAttribute(
+      'data-render-mode', lowPowerMode ? 'static' : 'animated'
+    );
 
     const configured = Boolean(cfg && cfg.URL && cfg.TOKEN
       && !cfg.URL.includes('YOUR-PROJECT') && cfg.TOKEN !== 'YOUR_LIVEKIT_TOKEN');
@@ -228,8 +243,13 @@
     }
 
     // ── Three.js orb ───────────────────────────────────────────────────────
-    const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    const renderer = new THREE.WebGLRenderer({
+      canvas,
+      alpha: true,
+      antialias: !lowPowerMode,
+      powerPreference: lowPowerMode ? 'low-power' : 'default',
+    });
+    renderer.setPixelRatio(lowPowerMode ? 1 : Math.min(window.devicePixelRatio || 1, 2));
     renderer.setClearColor(0x000000, 0);
 
     const scene  = new THREE.Scene();
@@ -257,6 +277,7 @@
       target.core.set(look.core);
       target.rim.set(look.rim);
       targetSize = look.size;
+      requestOrbRender();
     }
 
     const uniforms = {
@@ -308,15 +329,37 @@
       `,
     });
 
-    const sphereGeo = new THREE.IcosahedronGeometry(0.45, 48);
+    const sphereGeo = new THREE.IcosahedronGeometry(0.45, lowPowerMode ? 8 : 32);
     const sphere    = new THREE.Mesh(sphereGeo, sphereMat);
     scene.add(sphere);
+
+    // ── Rendering ──────────────────────────────────────────────────────────
+    // Static mode has no continuous animation loop: it redraws only when the
+    // viewport or agent state changes. Voice transport remains fully active.
+    const clock = new THREE.Clock();
+    let animationFrame = null;
+
+    function renderStatic() {
+      staticFrame = null;
+      uniforms.uColorCore.value.copy(target.core);
+      uniforms.uColorRim.value.copy(target.rim);
+      uniforms.uVolume.value = 0;
+      sphere.scale.setScalar(targetSize);
+      sphere.rotation.set(0, 0, 0);
+      renderer.render(scene, camera);
+    }
+
+    function requestOrbRender() {
+      if (!lowPowerMode || staticFrame !== null) return;
+      staticFrame = requestAnimationFrame(renderStatic);
+    }
 
     function resize() {
       const w = window.innerWidth, h = window.innerHeight;
       renderer.setSize(w, h, false);
       camera.aspect = w / h;
       camera.updateProjectionMatrix();
+      requestOrbRender();
     }
     window.addEventListener('resize', resize, { passive: true });
     resize();
@@ -329,25 +372,36 @@
     }
     function makeAnalyser(mediaStream) {
       const ac = ensureAudioCtx();
-      const src = ac.createMediaStreamSource(mediaStream);
-      const a = ac.createAnalyser();
-      a.fftSize = 512;
-      a.smoothingTimeConstant = 0.72;
-      src.connect(a);
-      return a;
+      const source = ac.createMediaStreamSource(mediaStream);
+      const node = ac.createAnalyser();
+      node.fftSize = 512;
+      node.smoothingTimeConstant = 0.72;
+      source.connect(node);
+      return { node, source };
+    }
+    function releaseAnalyser(analyser) {
+      if (!analyser) return;
+      try { analyser.source.disconnect(); } catch (_) {}
+      try { analyser.node.disconnect(); } catch (_) {}
+    }
+    function closeAudioContext() {
+      const context = audioCtx;
+      audioCtx = null;
+      if (context && context.state !== 'closed') {
+        context.close().catch((err) => console.warn('audio context close failed', err));
+      }
     }
     const freqBuf = new Uint8Array(256);
     function readVolume(analyser) {
       if (!analyser) return 0;
-      analyser.getByteFrequencyData(freqBuf);
+      analyser.node.getByteFrequencyData(freqBuf);
       let sum = 0;
       for (let i = 0; i < freqBuf.length; i++) sum += freqBuf[i];
       const avg = sum / freqBuf.length / 255;
       return Math.min(1, Math.pow(avg * 1.85, 1.25));
     }
 
-    // ── Render loop ─────────────────────────────────────────────────────────
-    const clock = new THREE.Clock();
+    // ── Animated render loop ────────────────────────────────────────────────
     function animate() {
       const dt = Math.min(0.05, clock.getDelta());
       const t = clock.elapsedTime;
@@ -371,27 +425,62 @@
       sphere.rotation.x  = Math.sin(t * 0.22) * 0.10;
 
       renderer.render(scene, camera);
-      requestAnimationFrame(animate);
+      animationFrame = requestAnimationFrame(animate);
     }
-    requestAnimationFrame(animate);
+
+    function startRendering() {
+      if (lowPowerMode || document.hidden || animationFrame !== null) return;
+      clock.start();
+      animationFrame = requestAnimationFrame(animate);
+    }
+
+    function stopRendering() {
+      if (animationFrame === null) return;
+      cancelAnimationFrame(animationFrame);
+      animationFrame = null;
+      clock.stop();
+    }
+
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) stopRendering();
+      else if (lowPowerMode) requestOrbRender();
+      else startRendering();
+    });
+
+    if (lowPowerMode) requestOrbRender();
+    else startRendering();
 
     // ── LiveKit connection ─────────────────────────────────────────────────
     let room = null;
     const attachedAudio = new Map();
+    const disposalPromises = new WeakMap();
 
     function removeTrack(track) {
       if (!attachedAudio.has(track)) return;
-      const element = attachedAudio.get(track);
+      const { element, analyser } = attachedAudio.get(track);
       track.detach();
       if (element) element.remove();
       attachedAudio.delete(track);
-      agentAnalyser = null;
+      releaseAnalyser(analyser);
+      if (agentAnalyser === analyser) agentAnalyser = null;
     }
 
     function clearAudio() {
       for (const track of attachedAudio.keys()) removeTrack(track);
+      releaseAnalyser(localAnalyser);
       localAnalyser = null;
       agentAnalyser = null;
+      closeAudioContext();
+    }
+
+    function disposeConnection(connection) {
+      if (!disposalPromises.has(connection)) {
+        const pending = Promise.resolve()
+          .then(() => connection.dispose())
+          .catch((err) => console.warn('room disposal failed', err));
+        disposalPromises.set(connection, pending);
+      }
+      return disposalPromises.get(connection);
     }
 
     async function startConversation() {
@@ -402,6 +491,7 @@
       const connection = new LK.Room({
         adaptiveStream: true,
         dynacast: true,
+        disconnectOnPageLeave: true,
         audioCaptureDefaults: {
           echoCancellation: true,
           noiseSuppression: true,
@@ -412,17 +502,22 @@
 
       connection.on(LK.RoomEvent.TrackSubscribed, (track) => {
         if (room !== connection || track.kind !== LK.Track.Kind.Audio) return;
+        if (attachedAudio.has(track)) return;
         const audioEl = track.attach();
         audioEl.autoplay = true;
         audioEl.playsInline = true;
         audioEl.style.display = 'none';
         document.body.appendChild(audioEl);
-        attachedAudio.set(track, audioEl);
+        let analyser = null;
         try {
-          agentAnalyser = makeAnalyser(new MediaStream([track.mediaStreamTrack]));
+          analyser = makeAnalyser(new MediaStream([track.mediaStreamTrack]));
+          agentAnalyser = analyser;
         } catch (err) { console.warn('agent analyser failed', err); }
+        attachedAudio.set(track, { element: audioEl, analyser });
       });
-      connection.on(LK.RoomEvent.TrackUnsubscribed, removeTrack);
+      connection.on(LK.RoomEvent.TrackUnsubscribed, (track) => {
+        if (room === connection) removeTrack(track);
+      });
 
       connection.on(LK.RoomEvent.ActiveSpeakersChanged, (speakers) => {
         if (room !== connection) return;
@@ -439,6 +534,7 @@
         room = null;
         clearAudio();
         setState('error');
+        void disposeConnection(connection);
       });
 
       try {
@@ -447,12 +543,12 @@
         await connection.startAudio();
         await connection.connect(cfg.URL, cfg.TOKEN);
         if (room !== connection) {
-          await connection.disconnect(); // stopped while connecting
+          await disposeConnection(connection); // stopped while connecting
           return;
         }
         await connection.localParticipant.setMicrophoneEnabled(true);
         if (room !== connection) {
-          await connection.disconnect(); // stopped during the permission prompt
+          await disposeConnection(connection); // stopped during the permission prompt
           return;
         }
         const mic = connection.localParticipant.getTrackPublication(LK.Track.Source.Microphone);
@@ -461,12 +557,15 @@
         }
         setState('listening');
       } catch (err) {
-        if (room !== connection) return;
+        if (room !== connection) {
+          await disposeConnection(connection);
+          return;
+        }
         room = null;
-        await connection.disconnect().catch(() => {});
         clearAudio();
         console.error('[orb] Could not connect. Check the token, project URL, and microphone permission.', err);
         setState('error');
+        await disposeConnection(connection);
       }
     }
 
@@ -476,8 +575,7 @@
       room = null; // ignore late events from this connection
       clearAudio();
       setState('idle');
-      try { await connection.disconnect(); }
-      catch (err) { console.warn('disconnect failed', err); }
+      await disposeConnection(connection);
     }
 
     function toggleConversation() {
@@ -486,6 +584,13 @@
     }
 
     orbButton.addEventListener('click', toggleConversation);
+    window.addEventListener('pagehide', () => {
+      const connection = room;
+      if (!connection) return;
+      room = null;
+      clearAudio();
+      void disposeConnection(connection);
+    });
     // Keep the setup error visible until config.js is populated and reloaded.
     if (configured) setState('idle');
   })();

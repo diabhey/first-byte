@@ -3,6 +3,7 @@
   // personal scratch notes are not ours to lint.
   "globs": [
     "**/*.md",
+    "!.git/**",
     "!**/.venv/**",
     "!**/node_modules/**",
     "!.abhi/**"

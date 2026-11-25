@@ -1,108 +1,102 @@
 # first-byte
 
-Course repo for **Production Voice AI Agents with LiveKit** by [Abhimanyu Selvan](https://diabhey.com).
+Course repository for **Production Voice AI Agents with LiveKit** by Abhimanyu Selvan. You'll run a voice agent, compare how it handles pauses and interruptions, ground its answers in a Moss index, and measure how long it takes to start replying.
 
-The name comes from TTS time-to-first-byte. The course measures the whole wait, from the moment you stop speaking to the first audio back, and shows which stage spent it.
+**During the live session, you can just watch.** When you're ready to try the code, start with [setup](#setup) and work through the four coding sections below at your own pace. Section 1 is the presentation. The code starts in Section 2. [Course syllabus](./SYLLABUS.md)
 
-[`SYLLABUS.md`](./SYLLABUS.md) covers what the course teaches. This README covers setup and the commands you run.
+## Setup
 
-## Sections
+1. Install [Git](https://git-scm.com/install), [uv](https://docs.astral.sh/uv/getting-started/installation/), and [LiveKit CLI 2.19.4 or newer](https://docs.livekit.io/intro/basics/cli/#get-started). The commands below install Python 3.13 through uv.
+2. Create a [LiveKit Cloud](https://cloud.livekit.io/) project. Copy its WebSocket URL, API key, and API secret. Run `lk cloud auth` to link the same project to the CLI. LiveKit Inference handles speech recognition, the language model, and speech synthesis.
+3. Create a [Moss](https://moss.dev/) project and copy its project ID and key. Choose a unique index name such as `firstbyte-yourname`. You'll build the index in Section 4.
+4. If you're starting from scratch, clone the repo and make your local configuration file. If you already have a checkout and a `.env`, open that checkout and keep your existing file.
 
-Course Section 1 is the talk and demo. It has no code, so the folders are numbered one lower.
+   ```bash
+   git clone https://github.com/diabhey/first-byte.git
+   cd first-byte
+   cp .env.example .env
+   ```
 
-| Course section | Folder | What you build |
-| --- | --- | --- |
-| 2 | [`01-hello-voice`](./sections/01-hello-voice/README.md) | A first voice agent, and the measured wait |
-| 3 | [`02-production-ux`](./sections/02-production-ux/README.md) | Semantic turn detection and tuned interruptions |
-| 4 | [`03-grounding-moss`](./sections/03-grounding-moss/README.md) | Moss retrieval on every spoken turn |
-| 5 | [`04-ship-it`](./sections/04-ship-it/README.md) | A LiveKit Cloud deploy, inspected in the dashboard |
+   Edit `.env` and fill in `LIVEKIT_URL`, `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET`, `MOSS_PROJECT_ID`, `MOSS_PROJECT_KEY`, and `MOSS_INDEX_NAME`. Keep your credentials in the ignored `.env` file.
 
-Each folder has one standalone `agent.py`. The [`orb`](./orb/README.md) is the browser page you use to call the deployed agent at the end.
+5. Install the locked dependencies, prepare the model assets, and check that both services authenticate.
 
-Exercises follow the course listing: 1–2 in Section 2, 3 in Section 3, 4–5 in Section 4, and 6 in Section 5.
+   ```bash
+   uv python install 3.13
+   uv sync --frozen --python 3.13
+   # No file list in this repo. Imports each installed livekit.plugins.* package
+   # and calls its download_files(). This lockfile only installs Silero, and that
+   # model already ships in the wheel, so this step fetches nothing.
+   uv run --frozen -m livekit.agents download-files
+   uv run --frozen python preflight.py
+   ```
 
-## Pre-class setup
+Moss supports Apple Silicon on macOS 14+, Windows x64, and Linux x64 or ARM64 with glibc 2.28+. Use Linux for the Moss exercises if you have an Intel Mac.
 
-Do this before the live session. Budget 30 to 40 minutes.
+## Run the exercises
 
-### 1. Tools
+Run each command from the `first-byte` folder. Use headphones and allow microphone access if prompted. The agent runs in your terminal and uses LiveKit Inference over the network. Press `q` to quit before starting the next agent. Use the [learner worksheet](./LEARNER_WORKSHEET.md) if you want to record your results.
 
-- Python 3.13 (3.11–3.14 works)
-- [uv](https://docs.astral.sh/uv/): `curl -LsSf https://astral.sh/uv/install.sh | sh`
-- [LiveKit CLI](https://docs.livekit.io/intro/basics/cli/) 2.19.3 or newer (`lk --version`)
-  - macOS: `brew install livekit-cli`, or `brew update && brew upgrade livekit-cli`
-  - Linux: `curl -sSL https://get.livekit.io/cli | bash`
-  - Windows: `winget install LiveKit.LiveKitCLI`
-- Headphones with a microphone. Laptop speakers and a built-in mic feed back into each other.
-
-Moss ships a native library. Use macOS 14+ on Apple Silicon, Linux (x86_64 or ARM64, glibc 2.28+), or Windows x64. On an Intel Mac, prepare a Linux environment before class.
-
-### 2. Accounts
-
-- **LiveKit Cloud**: the free Build plan at [cloud.livekit.io](https://cloud.livekit.io). LiveKit Inference covers STT, LLM, and TTS, so you need no provider keys. Run `lk cloud auth` once.
-- **Moss**: the free tier at [moss.dev](https://moss.dev). Copy the project ID and key, and pick a lowercase index name such as `firstbyte-yourname`.
-
-### 3. Repo
-
-```bash
-git clone https://github.com/diabhey/first-byte
-cd first-byte
-cp .env.example .env
-# paste your LIVEKIT_* and MOSS_* values into .env
-uv python install 3.13
-uv sync --locked --python 3.13
-```
-
-### 4. Model files
-
-```bash
-uv run -m livekit.agents download-files
-```
-
-Run this again after a dependency update.
-
-### 5. Pre-flight check
-
-```bash
-uv run python preflight.py
-```
-
-[`preflight.py`](./preflight.py) checks Python, the CLI, your credentials, the installed packages, and live access to LiveKit and Moss. Every check must pass. `--offline` skips the network checks.
-
-Build your Moss index before class. The steps are in [Grounding with Moss](./sections/03-grounding-moss/README.md#build-the-index).
-
-## Running an agent
+### Section 2 · Say hello
 
 ```bash
 lk agent console sections/01-hello-voice/agent.py
+```
+
+Ask “How’s it going?” Check that your question is transcribed, you hear a reply, and the terminal prints `TOTAL pipeline` with whether that turn was under 1370 ms. The greeting has no total. Try pausing mid-sentence and speaking over a reply. Save those observations for the next exercise. [Hello Voice exercise](./sections/01-hello-voice/README.md)
+
+### Section 3 · Compare turn handling
+
+```bash
 lk agent console sections/02-production-ux/agent.py
+```
+
+Repeat the same questions, pauses, and interruptions. Compare when the agent answers and how it reacts when you speak over it. [Production UX exercise](./sections/02-production-ux/README.md)
+
+### Section 4 · Ground answers with Moss
+
+Use an index built from the current course documents. If you already have one, skip the build command. If your index contains older course data, choose a new `MOSS_INDEX_NAME` before building.
+
+```bash
+uv run --frozen python sections/03-grounding-moss/build_index.py
+```
+
+Query the index before starting the agent. Check that it returns a source that matches the current `data/kb.json` for the first question and `(no results)` for the second.
+
+```bash
+uv run --frozen python sections/03-grounding-moss/query_index.py "Who is Abhimanyu Selvan?"
+uv run --frozen python sections/03-grounding-moss/query_index.py "How do I tune a bicycle derailleur?"
+```
+
+Start the grounding agent in voice mode and check its startup status.
+
+```bash
 lk agent console sections/03-grounding-moss/agent.py
+```
+
+If you see `[moss] retrieval on`, ask “Who is Abhimanyu Selvan?” aloud, then “Tell me more about his work.” Check `[moss] searching` and `[moss] injected`. The live demo starts in this state. If your checkout starts with retrieval off, try the [optional comparison exercise](./sections/03-grounding-moss/README.md#optional-exercise-compare-retrieval-off-and-on) or run [the completed Section 5 agent](#section-5--check-the-completed-agent).
+
+### Section 5 · Check the completed agent
+
+```bash
 lk agent console sections/04-ship-it/agent.py
 ```
 
-The console runs the agent on your machine with your microphone and speakers. Talk in the terminal. Press `m` to mute, `ctrl+t` to type, `?` for shortcuts, and `q` to quit. Quit one section before you start the next.
+This agent has retrieval enabled and uses the same Moss index. Repeat the Section 4 voice prompts, then check timing and usage in the terminal. [Observability exercise](./sections/04-ship-it/README.md#exercise-6-observe-one-local-worker)
 
-Sections 2 to 4 read the repo-root `.env`. Once Ship It has a `livekit.toml`, its console reads `sections/04-ship-it/.env.local` instead. [Ship It](./sections/04-ship-it/README.md#local-fallback) has the step.
+## If audio gets in the way
 
-## Deploying
+Use `lk agent console --list-devices` to check your input and output. To try a typed turn, run the first agent in text mode and press `Ctrl+C` to quit. Text mode skips speech recognition, audio playback, and the Moss turn hook. To inspect retrieval without audio, use the standalone queries from Section 4.
 
-Course Section 5 deploys the final agent to LiveKit Cloud. The commands are in [Ship It](./sections/04-ship-it/README.md#2-deploy). Then call it from the [orb](./orb/README.md) and [inspect the call](./sections/04-ship-it/README.md#4-inspect-the-call) in the dashboard.
+```bash
+lk agent console --text sections/01-hello-voice/agent.py
+```
 
-## Dependency baseline
+## If the agent won't start
 
-LiveKit Agents and Silero **1.8.11**, pinned in both lockfiles. Turn detection uses the SDK's local audio model, `inference.TurnDetector(version="v1-mini")`. After an upgrade, repeat the voice and deploy checks.
+- **SDK version is too old.** Check `pwd` and `git branch --show-current` to make sure you're using the checkout for this guide. Its lockfile uses LiveKit Agents 1.8.12. Run `uv sync --frozen --python 3.13` from that checkout to refresh your installed packages, then retry.
+- **No LiveKit API key found.** Check that `.env` is in the `first-byte` folder beside `pyproject.toml`. Fill in the URL, API key, and secret for the same LiveKit Cloud project and rerun preflight. If the warning persists, pass the file explicitly with `uv run --frozen --env-file .env lk agent console sections/01-hello-voice/agent.py`.
 
-## Resources
+## Optional Cloud deployment
 
-- [O'Reilly live event](https://www.oreilly.com/live-events/production-voice-ai-agents-with-livekit/0642572366988/)
-- [LiveKit Agents docs](https://docs.livekit.io/agents/)
-- [LiveKit Inference models](https://docs.livekit.io/agents/models/inference/)
-- [LiveKit Voice AI quickstart](https://docs.livekit.io/agents/start/voice-ai/)
-- [LiveKit Agents Python SDK](https://github.com/livekit/agents)
-- [Deploying agents to LiveKit Cloud](https://docs.livekit.io/deploy/agents/)
-- [LiveKit JS client SDK](https://docs.livekit.io/reference/client-sdk-js/)
-- [`lk agent` commands](https://docs.livekit.io/reference/developer-tools/livekit-cli/agent/)
-- [Moss docs](https://docs.moss.dev/docs)
-- [ArchByte architecture visualization](https://diabhey.com/tools/archbyte)
-- [`SYLLABUS.md`](./SYLLABUS.md): course outline and schedule
-- [`AGENTS.md`](./AGENTS.md): notes for coding agents editing this repo
+Once the completed agent works locally, you can deploy it to your LiveKit Cloud project and try the browser orb. [Deployment steps](./sections/04-ship-it/README.md#instructor-walkthrough-deployment-lifecycle) · [Browser orb setup](./orb/README.md)

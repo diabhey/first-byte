@@ -7,8 +7,8 @@ This file is the canonical agent guide for any coding agent. Prefer it over scat
 ## Project overview
 
 - Build path: Hello Voice → Production UX (turn detection) → Grounding with Moss → Ship It
-- Reference experience: [heartbyte.io](https://heartbyte.io); rehearse the opening demo against the course orb before delivery
-- Instructor notes live only in gitignored `prep/`: the spoken script and the delivery checklist. Do not add them back to the public tree.
+- Rehearse the opening demo with the course agent. HeartByte is the instructor’s separate iPhone voice diary project. [HeartByte launch waitlist](https://heartbyte.io/)
+- Instructor notes (delivery plan, operational checks, deleted-agent recovery) live in the gitignored `prep/` folder and must stay out of commits
 
 ## Course numbering
 
@@ -26,27 +26,30 @@ When editing docs, always say which numbering you're using.
 ## Setup commands
 
 ```bash
-uv sync --locked                                                # deps (repo root)
+uv sync --frozen                                                # deps (repo root)
 uv run python preflight.py                                      # local + authenticated checks
-uv run -m livekit.agents download-files                         # cache models before class
-lk agent console sections/<dir>/agent.py                   # run a section agent
+uv run -m livekit.agents download-files                         # plugin download_files(); Silero is a no-op on 1.8.12
+lk agent console sections/<dir>/agent.py                        # lowest-overhead local voice test
+lk agent console --text sections/<dir>/agent.py                 # audio-free fallback
 uv run python sections/03-grounding-moss/build_index.py         # create Moss index
 uv run python sections/03-grounding-moss/build_index.py --replace  # explicit rebuild
-uv run python sections/03-grounding-moss/query_index.py "q" [--alpha X --top-k N]
+uv run python sections/03-grounding-moss/query_index.py "q" [--alpha X --top-k N --min-score X]
 cd sections/04-ship-it && lk agent create --secrets-file=../../.env  # first deploy
 cd sections/04-ship-it && lk agent deploy                       # redeploys
 ```
 
-Copy `.env.example` → `.env` for local credentials. Do not invent or commit secrets. After `sections/04-ship-it/livekit.toml` exists, also copy the `LIVEKIT_*` and `MOSS_*` lines to the gitignored `sections/04-ship-it/.env.local`. The console reads that file instead of the repo-root `.env`.
+Copy `.env.example` → `.env` for local credentials. Do not invent or commit secrets.
 
 ## Validated SDK baseline
 
-The user-requested refresh upgrades the course to **LiveKit Agents 1.8.11**, with matching Silero in the root and deployable project. Use the committed lockfiles for reproducible classroom installs.
+The final November 2026 refresh upgrades the course to **LiveKit Agents 1.8.12**, matching Silero, and **Moss 1.24** in the root and deployable project. Use the committed lockfiles for reproducible classroom installs.
 
 - Keep matching LiveKit framework/plugin versions. Revalidate both projects after upgrades.
-- Use `AgentServer` and `@server.rtc_session()` in source. Run local development with LiveKit CLI 2.19.3+ and `lk agent console sections/<dir>/agent.py`; preserve the legacy `cli.run_app(server)` path only for compatibility. The console runs the agent on this machine and talks through the terminal microphone. `lk agent dev` remains available, and its isolated dev deployment must be selected explicitly in Agent Console.
-- Use `TurnHandlingOptions` and the built-in `inference.TurnDetector(version="v1-mini")` for audio-based turn detection and interruption settings; keep the deliberate non-interruptible Hello Voice baseline.
-- Current observability uses `conversation_item_added` and `ChatMessage.metrics` for turn timing, `session_usage_updated` for cumulative model usage, and `ctx.add_shutdown_callback` for the final summary. Do not reintroduce deprecated `metrics_collected` or `metrics.UsageCollector`.
+- Use `AgentServer` and `@server.rtc_session()` in source. The validated instructor CLI is 2.19.4. Prefer `lk agent console sections/<dir>/agent.py` for local voice testing: it talks directly to the laptop microphone and speakers without a browser or LiveKit room. Use `--text` as the audio-free fallback. Reserve `lk agent dev` plus Agent Console for an explicit room/deployment test.
+- Use `TurnHandlingOptions` and the built-in `inference.TurnDetector(version="v1-mini")` for audio-based turn detection. Keep the deliberate non-interruptible Hello Voice baseline, then teach adaptive interruption in later sections.
+- Keep preemptive generation enabled for the Production UX comparison. Disable it in the grounded sections because `on_user_turn_completed` changes the chat context; otherwise speculative output is discarded and regenerated.
+- Current observability uses `conversation_item_added` and `ChatMessage.metrics` for turn timing, `session_usage_updated` for cumulative model usage, and `ctx.add_shutdown_callback` for the final summary. The usage summary includes end-of-turn and interruption requests as well as LLM/STT/TTS use. Do not reintroduce deprecated `metrics_collected` or `metrics.UsageCollector`.
+- The LLM is configured through `LLM_MODEL`; keep the same documented default across all standalone sections and the deployment project.
 - The old text-turn-detector plugin and the `transformers<5` and `onnxruntime<1.26` caps belonged to the 1.3.x baseline and have been removed. Current ONNX Runtime wheels support macOS 14+ on Apple Silicon. Moss's current native wheels require a supported platform; Intel Macs need a Linux x86_64 environment.
 - Python 3.13 is the classroom recommendation; the project supports 3.11–3.14.
 - `sections/04-ship-it/` remains self-contained with its own `pyproject.toml`, `uv.lock`, Dockerfile, and `.dockerignore`. Keep the Dockerfile on Debian Trixie for native-wheel compatibility. Build for `linux/amd64` when validating on Apple Silicon.
@@ -58,14 +61,6 @@ The user-requested refresh upgrades the course to **LiveKit Agents 1.8.11**, wit
 - Deletion requires an explicit `--replace` flag. If the index name does not start with `firstbyte-`, `--replace` also requires interactive confirmation (retyping the index name) before deleting.
 - `create_index` requires `model_id="moss-minilm"` — omitting it is a runtime error.
 
-## Private files
-
-This repo is public. `prep/` is gitignored instructor material.
-
-- The spoken script is `prep/spoken-script.md`. The delivery checklist is `prep/COURSE_READINESS.md`. Never stage, commit, or push either file, and do not link them from student-facing docs.
-- Before a push, `git ls-files COURSE_READINESS.md TEACHING_GUIDE.md prep` must print nothing. If a copy is at the repo root, move it into `prep/` first.
-- Students who delete a Cloud agent use the short rebuild steps in `sections/04-ship-it/README.md`.
-
 ## Secrets
 
 - `.env` is local only; never commit it or paste real keys into tracked files.
@@ -76,15 +71,15 @@ This repo is public. `prep/` is gitignored instructor material.
 
 - Prefer clear, teachable diffs over clever refactors.
 - Keep each section's `agent.py` runnable standalone.
-- `03-grounding-moss`: Exercise 5 is the commented `on_user_turn_completed` in `agent.py` — leave it commented in the shipped tree; students uncomment live.
-- `04-ship-it`: students enable Agent observability in project settings, deploy, call the agent from the orb, then inspect the session in LiveKit Cloud's Agent insights (Exercise 6). The terminal box, per-reply usage line, and shutdown summary stay active in `agent.py` as the local fallback.
-- Match existing patterns: short instructions, Inference model strings (`deepgram/...`, `openai/...`, `cartesia/...`), Silero VAD, and local audio turn detection via `inference.TurnDetector(version="v1-mini")`. Do not restore the deprecated `MultilingualModel` plugin.
+- `03-grounding-moss`: Demo 5 uses the instructor’s retrieval-enabled checkout. A fresh learner checkout can start with the `on_user_turn_completed` method commented out for the optional off/on exercise. Check the startup status and use a spoken turn to verify injection.
+- `04-ship-it`: observability is active by default. Students run the complete grounded agent, inspect per-turn metrics and the shutdown usage summary, then deploy the same worker.
+- Match existing patterns: short instructions, Inference model strings (`deepgram/...`, `google/...`, `cartesia/...`), Silero VAD, and local audio turn detection via `inference.TurnDetector(version="v1-mini")`. Do not restore the deprecated `MultilingualModel` plugin.
 
 ## Doc sync
 
 Keep documentation responsibilities clear:
 
-- `SYLLABUS.md` — what the course covers and what students will learn. Prose only; no commands, no code blocks. Tracks the O'Reilly learning objectives. Listing and API differences belong in `prep/COURSE_READINESS.md`, not in the syllabus.
+- `SYLLABUS.md` — what the course covers and what students will learn. Prose only; no commands, no code blocks. Tracks the O'Reilly learning objectives; known listing/API differences are recorded in `prep/COURSE_READINESS.md`.
 - `README.md` — how to set up, run, and deploy. Owns the setup commands.
 - `sections/*/README.md` — what to do in one section, and what to watch happen.
 
@@ -99,8 +94,9 @@ When docs and code disagree, code reality wins; then update the docs.
 
 ## Testing
 
-- Voice testing: headphones + mic; run `lk agent console sections/<dir>/agent.py` and talk in the terminal. For Ship It, once `livekit.toml` exists, credentials come from `sections/04-ship-it/.env.local`.
-- For metrics and usage verification, use `sections/04-ship-it`: Agent insights for a deployed call, or the console for turn timing, the per-reply usage total, and the session summary on shutdown.
+- Low-memory voice testing: headphones + mic; run one `lk agent console sections/<dir>/agent.py` process at a time. This is local execution, not offline execution: LiveKit Inference and Moss still require credentials and network access. Do not run a browser orb, local Docker build, model download, or Cloud build concurrently while screen sharing.
+- Room testing (optional): run `lk agent dev sections/<dir>/agent.py`, open [Agent Console](https://docs.livekit.io/testing/agent-console/), and select the exact `dev-...` deployment printed by the CLI. Do not use default production/legacy Playground automatic dispatch for this worker.
+- For metrics and usage verification, use `sections/04-ship-it`; inspect turn timing, cumulative usage updates, and the session summary on shutdown.
 - Mic-less smoke test (optional): publish synthetic speech into a fresh room with `lk room join --publish`, with these rules:
   - Pad clips with trailing silence so VAD sees end-of-speech.
   - The publisher must be the **first** participant in the room (RoomIO links to the first mic).
@@ -108,6 +104,7 @@ When docs and code disagree, code reality wins; then update the docs.
 
 ## Out of scope
 
-- Do not claim live readiness from offline checks alone. After an SDK, model, or deployment change, update `prep/COURSE_READINESS.md` and leave that file untracked.
+- Do not claim live readiness from offline checks alone. Complete the course rehearsal after SDK, model, or deployment changes.
+- Do not create or build a Cloud deployment during the live class. After the complete local flow passes, rehearse the first private deployment off-camera and warm it shortly before any optional Cloud demonstration.
 - Don't turn teaching stubs into production frameworks.
 - Don't run `build_index.py` against production Moss indexes.

@@ -6,12 +6,11 @@ Run before the live session:
 
 Verifies:
   - Python version is >= 3.11 and < 3.15
-  - LiveKit CLI >= 2.19.3 is installed
+  - LiveKit CLI >= 2.19.4 is installed
   - Credentials are populated in .env or the exported environment
   - LiveKit Cloud credentials authenticate
   - Moss credentials authenticate
   - Required Python packages are importable
-  - Installed livekit-agents is >= 1.8.11 (catches a stale .venv)
 
 Use --offline to check local setup without contacting either service.
 Credentials are still validated for presence and format. This does not test
@@ -34,8 +33,7 @@ YELLOW = "\033[93m"
 DIM = "\033[2m"
 RESET = "\033[0m"
 AUTH_TIMEOUT_SECONDS = 15
-MIN_LIVEKIT_CLI_VERSION = (2, 19, 3)
-MIN_LIVEKIT_AGENTS_VERSION = (1, 8, 11)
+MIN_LIVEKIT_CLI_VERSION = (2, 19, 4)
 MOSS_INDEX_PLACEHOLDER = "firstbyte-your-handle"
 MOSS_INDEX_PATTERN = re.compile(r"[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?")
 
@@ -72,7 +70,11 @@ def check_livekit_cli() -> bool:
     section("LiveKit CLI")
     minimum = ".".join(map(str, MIN_LIVEKIT_CLI_VERSION))
     if not shutil.which("lk"):
-        fail("lk command not found", "Install the LiveKit CLI, then run `lk cloud auth`.")
+        fail(
+            "lk command not found",
+            "Install the LiveKit CLI, then use `lk agent console` for a "
+            "low-memory local test; no deployed agent is required.",
+        )
         return False
     try:
         result = subprocess.run(["lk", "--version"], capture_output=True,
@@ -91,7 +93,8 @@ def check_livekit_cli() -> bool:
     installed = ".".join(map(str, version))
     if version < MIN_LIVEKIT_CLI_VERSION:
         fail(f"LiveKit CLI {installed} found; need >= {minimum}",
-             "Upgrade the CLI for `lk agent console` (macOS: `brew upgrade livekit-cli`).")
+             "Upgrade for local `lk agent console` testing (macOS: "
+             "`brew upgrade livekit-cli`); no deployed agent is required.")
         return False
     ok(f"LiveKit CLI {installed} (>= {minimum} required)")
     return True
@@ -150,6 +153,19 @@ def check_env_vars() -> dict[str, bool]:
         else:
             fail(f"{key} not set", "Paste it into .env from your provider dashboard.")
             results[key] = False
+
+    min_score = os.environ.get("MOSS_MIN_SCORE", "").strip()
+    if min_score:
+        try:
+            value = float(min_score)
+        except ValueError:
+            value = -1.0
+        if 0.0 <= value <= 1.0:
+            ok("MOSS_MIN_SCORE is between 0.0 and 1.0")
+            results["MOSS_MIN_SCORE"] = True
+        else:
+            fail("MOSS_MIN_SCORE must be between 0.0 and 1.0")
+            results["MOSS_MIN_SCORE"] = False
     return results
 
 
@@ -169,25 +185,7 @@ def check_imports() -> bool:
         except Exception as exc:
             fail(f"{label} not importable", f"Run `uv sync`. Error: {exc}")
             all_ok = False
-    return all_ok and check_agents_version()
-
-
-def check_agents_version() -> bool:
-    from importlib.metadata import PackageNotFoundError, version
-
-    minimum = ".".join(map(str, MIN_LIVEKIT_AGENTS_VERSION))
-    try:
-        installed = version("livekit-agents")
-    except PackageNotFoundError:
-        fail("livekit-agents not installed", "Run `uv sync --locked`.")
-        return False
-    match = re.match(r"(\d+)\.(\d+)\.(\d+)", installed)
-    if not match or tuple(map(int, match.groups())) < MIN_LIVEKIT_AGENTS_VERSION:
-        fail(f"livekit-agents {installed} installed; need >= {minimum}",
-             "The .venv is stale. Run `uv sync --locked` in this directory.")
-        return False
-    ok(f"livekit-agents {installed} (>= {minimum} required)")
-    return True
+    return all_ok
 
 
 async def check_livekit() -> bool:
@@ -269,6 +267,8 @@ async def main(*, offline: bool = False) -> int:
     if all(results):
         scope = "Local setup checks" if offline else "Setup and authentication checks"
         print(f"{GREEN}{scope} passed.{RESET}\n")
+        print("Low-memory local test (no deployment): `lk agent console --text "
+              "sections/01-hello-voice/agent.py`.\n")
         print("Still rehearse model downloads, voice, retrieval, and deployment before class.\n")
         return 0
     print(f"{RED}Some checks failed.{RESET} Fix them before the live session.\n")

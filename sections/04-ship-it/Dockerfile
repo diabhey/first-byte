@@ -7,11 +7,12 @@
 # uv is installed by copying its statically-linked binary from astral's image.
 ARG PYTHON_VERSION=3.13
 FROM python:${PYTHON_VERSION}-slim-trixie AS base
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /usr/local/bin/
+COPY --from=ghcr.io/astral-sh/uv:0.11.6 /uv /uvx /usr/local/bin/
 
 # Keeps Python from buffering stdout and stderr to avoid situations where
 # the application crashes without emitting any logs due to buffering.
-ENV PYTHONUNBUFFERED=1
+ENV PYTHONUNBUFFERED=1 \
+    UV_COMPILE_BYTECODE=1
 
 # --- Build stage ---
 # Install dependencies, build native extensions, and prepare the application
@@ -47,9 +48,8 @@ RUN uv sync --locked
 # (Excludes files specified in .dockerignore)
 COPY . .
 
-# Pre-download any ML models or files the agent needs
-# This ensures the container is ready to run immediately without downloading
-# dependencies at runtime, which improves startup time and reliability
+# Discovers installed livekit.plugins.* packages and calls download_files().
+# Silero's ONNX file is already in its wheel, so this step fetches nothing here.
 RUN uv run --locked -m livekit.agents download-files
 # The v1-mini turn model ships in livekit-local-inference, not a per-user cache.
 RUN uv run --locked python -c "from livekit.local_inference import init_eot; init_eot()"

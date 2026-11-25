@@ -1,77 +1,88 @@
 # Course Section 2: Hello Voice
 
-[Course README](../../README.md) · Next: [Production UX →](../02-production-ux/README.md)
+Directory 1 of 4: `01-hello-voice`.
 
-Folder `01-hello-voice`. Start a voice agent, measure the wait, then feel the broken baseline.
+## Goal
 
-## Run
+Start one local voice worker, measure the wait to first server audio, and document the deliberately awkward baseline.
 
-Finish the [pre-class setup](../../README.md#pre-class-setup) first.
+## Run with the low-memory path
+
+Complete the [root setup](../../README.md#setup), stop any other agent worker, and run from the repository root:
 
 ```bash
 lk agent console sections/01-hello-voice/agent.py
 ```
 
-Talk in the terminal with headphones on. Press `q` to quit.
+Terminal Agent Console connects the worker directly to your microphone and speakers. It avoids a browser and LiveKit room. The worker runs locally, but the pipeline is not offline: Deepgram STT, the configured LLM, and Cartesia TTS use LiveKit Inference.
 
-The pipeline is [`agent.py`](./agent.py):
+Console controls:
 
-```text
-You speak → Deepgram STT → GPT-4o-mini → Cartesia TTS → you hear audio
+- `m`: mute/unmute;
+- `Ctrl+T`: switch between voice and text input;
+- `q`: quit.
+
+If audio is unavailable, start with:
+
+```bash
+lk agent console --text sections/01-hello-voice/agent.py
 ```
 
-LiveKit Inference runs the three models from their short names. Silero VAD runs on your machine.
+Text mode can confirm the LLM and response path, but it disables STT/TTS and cannot validate the timing or voice behavior in this exercise. Mark the fallback on the [learner worksheet](../../LEARNER_WORKSHEET.md).
+
+## Pipeline
+
+```text
+speech → Deepgram nova-3 → LLM_MODEL → Cartesia sonic-3 → audio
+```
+
+The default `LLM_MODEL` is `google/gemma-4-31b-it`; `.env` can override it for a rehearsed model. Silero VAD runs in the worker.
 
 ## Read the timing
 
-After each reply the terminal prints one box:
-
 ```text
-END OF TURN (+ transcript …)          … ms
-LLM FIRST TOKEN                       … ms
-    └ handoff to TTS                      … ms
-TTS FIRST BYTE                        … ms
-    └ handoffs between clocks             … ms
-… + … + … = … ms
-… ms                          measured pause
+[timing] end-of-turn delay:      ...
+[timing] transcription delay:    ...
+[timing] LLM TTFT (first token): ...
+[timing] TTS TTFB (first byte):  ...
+[timing] TOTAL pipeline:         ...ms — under 1370ms
 ```
 
-- **End of turn** is how long after your sound stopped the agent decided you were done. The transcript time in brackets is already inside it.
-- **LLM first token** and **TTS first byte** are the two model clocks.
-- The indented **handoff** rows are the gaps between those clocks. They are part of the sum.
-- The **measured pause** is speech end to the first audio frame. The sum matches it.
+Ask a question after the greeting. The greeting has no user turn, so the worker prints that it has no pipeline total yet.
 
-The greeting has no box, because nobody spoke before it.
+- Transcription delay is the time until STT produces the final transcript. It is not STT “first byte.”
+- LLM TTFT is time to first token.
+- TTS TTFB is time to first audio chunk from synthesis.
+- `TOTAL pipeline` comes from `ChatMessage.metrics["e2e_latency"]`: speech end to first server audio. It excludes playback on your laptop.
+- The budget in this section is 1370 ms. The line says `under`, `at`, or `over` 1370 ms.
+- The stages can overlap. Do not add them.
 
-## Exercises 1–2: feel the broken baseline
+## Exercise 1: one complete reply
 
-This file is wrong on purpose:
+Ask a short factual question. Confirm the transcript, one complete response, and the configured model shown at startup.
 
-```python
-turn_handling=TurnHandlingOptions(
-    turn_detection="vad",
-    interruption={"enabled": False, "discard_audio_if_uninterruptible": True},
-    preemptive_generation={"enabled": False},
-)
-```
+## Exercise 2: feel and measure the baseline
 
-Silence ends your turn, and the agent cannot be interrupted. Say each line and note whether it **jumped in** or **waited**:
+This worker intentionally uses VAD-only turn detection, disables interruption, and disables preemptive generation.
 
-1. “What’s two plus two?” Write down the measured pause.
-2. “Hmm, the thing I want to ask is” and stay silent for 2 seconds.
-3. “What’s the weather”, wait 2 seconds, then “in Lisbon?”
-4. Talk over the agent while it replies.
+Use the same script later in Course Section 3:
 
-It will answer mid-thought, and it will ignore you when you talk over it.
+1. Ask “How’s it going?” at least three times. Record complete-turn `TOTAL pipeline` values and calculate the median.
+2. Say “Hmm, the thing I want to ask is,” then pause for two seconds.
+3. Say “What’s the weather,” pause for two seconds, then finish “in Lisbon?”
+4. Speak a complete sentence over the agent during its reply.
+5. Say only “mm-hm” during another reply.
 
-> Turn detection decides when *you* are done. Interruption decides when the *agent* stops. They are separate problems.
+Record observed outcomes, not guaranteed ones. The baseline may commit during an unfinished pause. Because interruption is disabled, speaking over it should not stop the reply.
+
+> Turn detection decides when the user finished a turn. Interruption handling decides whether incoming speech stops the agent's reply. They are separate mechanisms.
+
+Stop this worker with `q` or `Ctrl+C` before opening [Course Section 3](../02-production-ux/README.md).
 
 ## Concepts
 
-- `AgentSession` runs the STT → LLM → TTS pipeline.
-- `Agent` holds the instructions.
-- `AgentServer` registers the entrypoint with `@server.rtc_session()`, and `JobContext` is the handle on the room.
-
----
-
-[Course README](../../README.md) · Next: [Production UX →](../02-production-ux/README.md)
+- `AgentSession` owns the STT, LLM, and TTS pipeline.
+- `Agent` contains instructions and response behavior.
+- `JobContext` is the job/room handle when the worker runs in that environment.
+- `AgentServer` registers the entrypoint with `@server.rtc_session()`.
+- `LLM_MODEL` isolates a fast-changing model choice from the course code.

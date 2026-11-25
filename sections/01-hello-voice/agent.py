@@ -1,14 +1,16 @@
 """
-Section 1: Hello voice.
+Course Section 2 / Directory 01: Hello voice.
 
 Your first voice agent on LiveKit Inference. No separate provider keys needed.
-The Inference layer routes STT to Deepgram, the LLM to OpenAI, and TTS to
-Cartesia, all billed via your LiveKit account.
+By default, the Inference layer routes STT to Deepgram, the LLM to Google, and
+TTS to Cartesia, all billed via your LiveKit account.
 
-Run:
+Run locally without a browser or deployed agent:
     lk agent console sections/01-hello-voice/agent.py
 
-Speak in the terminal. After each reply, one box shows that turn's pipeline.
+Add `--text` after `console` for the lowest-memory check. Text mode skips STT
+and TTS; use voice mode afterward to verify the complete pipeline. Watch the
+terminal for [timing] lines after each turn.
 """
 
 import os
@@ -28,6 +30,14 @@ from livekit.plugins import silero
 
 load_dotenv()
 server = AgentServer()
+DEFAULT_LLM_MODEL = "google/gemma-4-31b-it"
+# Speech end to first server audio. Playback on the laptop is not included.
+PIPELINE_BUDGET_MS = 1370
+
+
+def _llm_model() -> str:
+    """Return the configured Inference model, with a stable course default."""
+    return os.environ.get("LLM_MODEL", "").strip() or DEFAULT_LLM_MODEL
 
 
 class HelloAgent(Agent):
@@ -46,198 +56,44 @@ class HelloAgent(Agent):
         )
 
 
-_RESET = "\033[0m"
-_BOLD = "\033[1m"
-_DIM = "\033[2m"
-_BLUE = "\033[34m"
-_GREEN = "\033[32m"
-_PURPLE = "\033[35m"
-_ORANGE = "\033[38;5;208m"
-_GAP = "\033[90m"
-_BOX_WIDTH = 62
-
-
-def _paint(color: str, text: str) -> str:
-    if os.environ.get("NO_COLOR"):
-        return text
-    return f"{color}{text}{_RESET}"
-
-
-def _ms(value: float | None) -> str:
-    if value is None:
-        return "n/a"
-    return f"{value * 1000:.0f} ms"
-
-
-def _rule() -> str:
-    dots = ("· " * _BOX_WIDTH)[:_BOX_WIDTH]
-    return f"│ {_paint(_DIM, dots.ljust(_BOX_WIDTH))} │"
-
-
-def _line(text: str) -> str:
-    shown = text if len(text) <= _BOX_WIDTH else text[: _BOX_WIDTH - 1] + "…"
-    return f"│ {shown.ljust(_BOX_WIDTH)} │"
-
-
-_NEST_INDENT = 6
-
-
-def _metric_line(label: str, value: str, color: str, indent: int = 0) -> str:
-    shown = (" " * indent) + label
-    padded = value.rjust(8)
-    # Nested rows sit on the right edge. Stage rows sit just inward of them.
-    right_pad = max(_NEST_INDENT - indent, 0)
-    gap = _BOX_WIDTH - len(shown) - len(padded) - right_pad
-    body = (
-        f"{_paint(color, shown)}{' ' * max(gap, 2)}"
-        f"{_paint(_BOLD + color, padded)}{' ' * right_pad}"
-    )
-    return f"│ {body} │"
-
-
-def _round_ms(value: float | None) -> int | None:
-    if value is None:
-        return None
-    return round(value * 1000)
-
-
-def _sum_line(parts: list[tuple[int, str]]) -> str:
-    """Colored addition of the rounded milliseconds. The last part is the total."""
-    shown = " + ".join(str(ms) for ms, _color in parts[:-1])
-    total = parts[-1][0]
-    plain = f"{shown} = {total} ms"
-    colored = " + ".join(_paint(color, str(ms)) for ms, color in parts[:-1])
-    colored += " = " + _paint(_BOLD + _ORANGE, f"{total} ms")
-    return f"│ {colored}{' ' * max(_BOX_WIDTH - len(plain), 0)} │"
-
-
-def _print_pipeline_box(
-    user_text: str,
-    end_of_turn: float | None,
-    transcript: float | None,
-    llm_ttft: float | None,
-    tts_ttfb: float | None,
-    total: float,
-    llm_ttfs: float | None = None,
-    retrieval: float | None = None,
-    interrupted: bool = False,
-) -> None:
-    """One box for a single speech-end to first-audio path.
-
-    End-of-turn delay already includes the time until the final transcript.
-    The three stage clocks do not cover the handoffs between them.
-    The measured total is the pause from speech end to the first audio frame.
-    """
-    quote = user_text.replace("\n", " ").strip() or "(no transcript)"
-    end_ms = _round_ms(end_of_turn)
-    llm_ms = _round_ms(llm_ttft)
-    tts_ms = _round_ms(tts_ttfb)
-    total_ms = _round_ms(total) or 0
-    sentence_ms = None
-    ttfs_ms = _round_ms(llm_ttfs)
-    if ttfs_ms is not None and llm_ms is not None:
-        sentence_ms = max(ttfs_ms - llm_ms, 0)
-
-    other_ms = None
-    if None not in (end_ms, llm_ms, tts_ms):
-        other_ms = total_ms - end_ms - llm_ms - tts_ms - (sentence_ms or 0)
-
-    if interrupted:
-        verdict, verdict_color = "Reply cancelled", _ORANGE
-    elif total_ms < 1000:
-        verdict, verdict_color = "Under 1 second in this local test", _GREEN
-    else:
-        verdict, verdict_color = "This local test ran past 1 second", _ORANGE
-    number = f"{total_ms} ms".rjust(8)
-    gap = _BOX_WIDTH - len(number) - len(verdict)
-    total_line = (
-        f"{_paint(_BOLD + _ORANGE, number)}{' ' * max(gap, 2)}"
-        f"{_paint(verdict_color, verdict)}"
-    )
-
-    end_label = "END OF TURN"
-    if transcript is not None:
-        end_label = f"END OF TURN (+ transcript {_ms(transcript)})"
-    rows = [
-        _metric_line(end_label, _ms(end_of_turn), _BLUE, indent=2),
-        _metric_line("LLM FIRST TOKEN", _ms(llm_ttft), _PURPLE, indent=2),
-    ]
-    equation: list[tuple[int, str]] = []
-    if end_ms is not None:
-        equation.append((end_ms, _BLUE))
-    if llm_ms is not None:
-        equation.append((llm_ms, _PURPLE))
-    if sentence_ms:
-        rows.append(_metric_line("└ handoff to TTS", f"{sentence_ms} ms", _GAP, indent=6))
-        equation.append((sentence_ms, _GAP))
-    rows.append(_metric_line("TTS FIRST BYTE", _ms(tts_ttfb), _ORANGE, indent=2))
-    if tts_ms is not None:
-        equation.append((tts_ms, _ORANGE))
-    if other_ms is not None and other_ms > 1:
-        handoff_label = "└ handoffs between clocks"
-        if retrieval is not None:
-            handoff_label = f"└ handoffs between clocks (+ moss {_ms(retrieval)})"
-        rows.append(_metric_line(handoff_label, f"{other_ms} ms", _GAP, indent=6))
-        equation.append((other_ms, _GAP))
-    elif retrieval is not None:
-        rows.append(_line(f"Moss retrieval {_ms(retrieval)}, inside the handoffs."))
-    equation.append((total_ms, _ORANGE))
-
-    lines = [
-        "┌" + "─" * (_BOX_WIDTH + 2) + "┐",
-        _line(f'"{quote}"'),
-        _rule(),
-        *rows,
-        _rule(),
-    ]
-    if other_ms is not None and other_ms < -1:
-        lines.append(_line(f"These clocks overlap by {-other_ms} ms."))
-    elif equation:
-        lines.append(_sum_line(equation))
-    lines.extend([
-        f"│ {total_line} │",
-        _line("Measured pause: speech end → first audio frame."),
-        "└" + "─" * (_BOX_WIDTH + 2) + "┘",
-    ])
-    print("\n" + "\n".join(lines) + "\n", flush=True)
-
-
 def _attach_timing_logs(session: AgentSession) -> None:
-    """Hold the user half of a turn until the reply arrives, then print one box."""
-    pending_user: dict | None = None
-
+    """Read component timing and server-side first-audio latency per turn."""
     @session.on("conversation_item_added")
     def _on_conversation_item_added(ev: ConversationItemAddedEvent) -> None:
-        nonlocal pending_user
         item = ev.item
         if not isinstance(item, ChatMessage):
             return
         if item.role == "user":
-            pending_user = {
-                "text": item.text_content or "",
-                "end_of_turn": item.metrics.get("end_of_turn_delay"),
-                "transcript": item.metrics.get("transcription_delay"),
-                "retrieval": item.metrics.get("on_user_turn_completed_delay"),
-            }
-            return
-        if item.role != "assistant":
-            return
-        total = item.metrics.get("e2e_latency")
-        # The greeting has no preceding user turn, so it has no end-to-end total.
-        if total is None or pending_user is None:
-            return
-        _print_pipeline_box(
-            pending_user["text"],
-            pending_user["end_of_turn"],
-            pending_user["transcript"],
-            item.metrics.get("llm_node_ttft"),
-            item.metrics.get("tts_node_ttfb"),
-            total,
-            item.metrics.get("llm_node_ttfs"),
-            pending_user["retrieval"],
-            interrupted=bool(item.interrupted),
-        )
-        pending_user = None
+            for key, label in (
+                ("end_of_turn_delay", "end-of-turn delay"),
+                ("transcription_delay", "transcription delay"),
+            ):
+                value = item.metrics.get(key)
+                if value is not None:
+                    print(f"[timing] {label}: {value:.2f}s")
+        elif item.role == "assistant":
+            for key, label in (
+                ("llm_node_ttft", "LLM TTFT (first token)"),
+                ("tts_node_ttfb", "TTS TTFB (first byte)"),
+            ):
+                value = item.metrics.get(key)
+                if value is not None:
+                    print(f"[timing] {label}: {value:.2f}s")
+            total = item.metrics.get("e2e_latency")
+            if total is None:
+                print("[timing] greeting has no user turn, so there is no pipeline total yet")
+                return
+            total_ms = round(total * 1000)
+            if total_ms < PIPELINE_BUDGET_MS:
+                verdict = "under"
+            elif total_ms == PIPELINE_BUDGET_MS:
+                verdict = "at"
+            else:
+                verdict = "over"
+            print(
+                f"[timing] TOTAL pipeline: {total_ms}ms — {verdict} {PIPELINE_BUDGET_MS}ms "
+                "(speech end → first server audio; excludes playback)"
+            )
 
 
 @server.rtc_session()
@@ -246,7 +102,7 @@ async def entrypoint(ctx: JobContext) -> None:
 
     session = AgentSession(
         stt="deepgram/nova-3:en",
-        llm="openai/gpt-4o-mini",
+        llm=_llm_model(),
         tts="cartesia/sonic-3",
         vad=silero.VAD.load(),
         # Deliberately broken baseline: VAD-only, no barge-in, and no

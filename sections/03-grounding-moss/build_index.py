@@ -6,6 +6,7 @@ Moss index with the documents inside. Run once before Exercise 4:
 
     uv run python sections/03-grounding-moss/build_index.py
 
+If you already have a course index, use query_index.py to check its contents.
 Use --replace to explicitly delete and recreate an existing scratch index.
 """
 
@@ -27,6 +28,10 @@ MOSS_INDEX_PATTERN = re.compile(r"[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?")
 COURSE_INDEX_PREFIX = "firstbyte-"
 
 load_dotenv(REPO_ROOT / ".env")
+
+
+class IndexAlreadyExists(RuntimeError):
+    """The configured index is already present in Moss."""
 
 
 def validate_index_name(index_name: str) -> str:
@@ -77,9 +82,11 @@ async def main(*, replace: bool = False) -> None:
         existing_indexes = await client.list_indexes()
         index_exists = any(index.name == index_name for index in existing_indexes)
         if index_exists and not replace:
-            raise RuntimeError(
-                f"Index '{index_name}' already exists. Re-run with --replace "
-                "only if you intend to delete and recreate it."
+            raise IndexAlreadyExists(
+                f"Index '{index_name}' already exists and was left intact.\n"
+                "To check the existing index, run:\n"
+                '  uv run --frozen python sections/03-grounding-moss/query_index.py "Who is Abhimanyu Selvan?"\n'
+                "To build a separate index, choose a new MOSS_INDEX_NAME in .env."
             )
         if index_exists:
             confirm_replace(index_name)
@@ -103,4 +110,7 @@ if __name__ == "__main__":
         help="Delete and recreate the configured scratch index if it exists.",
     )
     args = parser.parse_args()
-    asyncio.run(main(replace=args.replace))
+    try:
+        asyncio.run(main(replace=args.replace))
+    except IndexAlreadyExists as exc:
+        sys.exit(str(exc))

@@ -26,6 +26,7 @@ def load_module(name, relative_path):
 
 preflight = load_module("course_preflight", "preflight.py")
 index_builder = load_module("course_index_builder", "sections/03-grounding-moss/build_index.py")
+index_query = load_module("course_index_query", "sections/03-grounding-moss/query_index.py")
 
 
 class PreflightTests(unittest.TestCase):
@@ -70,6 +71,12 @@ class PreflightTests(unittest.TestCase):
         with patch.object(Path, "exists", return_value=False):
             self.assertTrue(preflight.check_env_file())
 
+    def test_min_score_must_be_a_probability(self):
+        self.env["MOSS_MIN_SCORE"] = "not-a-score"
+        with patch.dict(os.environ, self.env, clear=True):
+            result = preflight.check_env_vars()
+        self.assertFalse(result["MOSS_MIN_SCORE"])
+
 
 class CLIVersionTests(unittest.TestCase):
     def check_output(self, output):
@@ -79,15 +86,16 @@ class CLIVersionTests(unittest.TestCase):
             return preflight.check_livekit_cli()
 
     def test_current_and_newer_stable_cli_pass(self):
-        for version in ("lk version 2.19.3", "lk version 2.20.0", "lk version 2.19.3+build.1"):
+        for version in ("lk version 2.19.4", "lk version 2.20.0", "lk version 2.19.4+build.1"):
             with self.subTest(version=version):
                 self.assertTrue(self.check_output(version))
 
     def test_older_cli_fails(self):
+        self.assertFalse(self.check_output("lk version 2.19.3"))
         self.assertFalse(self.check_output("lk version 2.16.0"))
 
     def test_malformed_and_prerelease_versions_fail(self):
-        for version in ("", "unknown version", "lk version 2.19.3-beta.1"):
+        for version in ("", "unknown version", "lk version 2.19.4-beta.1"):
             with self.subTest(version=version):
                 self.assertFalse(self.check_output(version))
 
@@ -219,6 +227,25 @@ class GroundingTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(context.items[-1].role, "system")
         self.assertIn("HeartByte builds voice agents.", context.items[-1].text_content)
         self.assertIn('source="Course Notes"', context.items[-1].text_content)
+        options = client.query.await_args.args[2]
+        self.assertAlmostEqual(options.min_score, 0.5)
+        self.assertEqual(client.query.await_args.args[1], "What is HeartByte?")
+
+    async def test_follow_up_search_includes_the_previous_turn(self):
+        from livekit.agents import ChatContext, ChatMessage
+        client = MagicMock(query=AsyncMock(return_value=SimpleNamespace(docs=[])))
+        agent = self.ship.HeartByteAgent(client, "firstbyte-test")
+        context = ChatContext()
+        context.add_message(
+            role="assistant",
+            content=["Please feel free to ask me anything about Abhi's work."],
+        )
+        with contextlib.redirect_stdout(io.StringIO()):
+            await agent.on_user_turn_completed(
+                context, ChatMessage(role="user", content=["Tell me more about his work."]))
+        query = client.query.await_args.args[1]
+        self.assertIn("Abhi's work", query)
+        self.assertIn("Tell me more about his work.", query)
 
     async def test_empty_user_turn_does_not_retrieve(self):
         from livekit.agents import ChatContext, ChatMessage
@@ -237,17 +264,82 @@ class GroundingTests(unittest.IsolatedAsyncioTestCase):
             await agent.on_user_turn_completed(
                 ChatContext(), ChatMessage(role="user", content=["What is HeartByte?"]))
 
+    async def test_no_results_adds_no_grounding_context(self):
+        from livekit.agents import ChatContext, ChatMessage
+        client = MagicMock(query=AsyncMock(return_value=SimpleNamespace(docs=[])))
+        agent = self.ship.HeartByteAgent(client, "firstbyte-test", min_score=0.7)
+        context = ChatContext()
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            await agent.on_user_turn_completed(
+                context, ChatMessage(role="user", content=["Unrelated question"]))
+        self.assertEqual(len(context.items), 0)
+        self.assertIn("no results", output.getvalue())
+        self.assertAlmostEqual(client.query.await_args.args[2].min_score, 0.7)
+
+    async def test_index_load_failure_is_fatal_and_actionable(self):
+        client = MagicMock(load_index=AsyncMock(side_effect=RuntimeError("offline")))
+        with self.assertRaisesRegex(RuntimeError, "no cloud fallback") as caught:
+            await self.ship._load_moss_index_or_raise(client, "firstbyte-test")
+        self.assertIn("build_index.py", str(caught.exception))
+
+    def test_model_and_min_score_are_configurable(self):
+        with patch.dict(os.environ, {}, clear=True):
+            self.assertEqual(self.ship._llm_model(), "google/gemma-4-31b-it")
+            self.assertEqual(self.ship._moss_min_score(), 0.5)
+        with patch.dict(os.environ, {
+            "LLM_MODEL": "provider/custom-model",
+            "MOSS_MIN_SCORE": "0.75",
+        }, clear=True):
+            self.assertEqual(self.ship._llm_model(), "provider/custom-model")
+            self.assertEqual(self.ship._moss_min_score(), 0.75)
+        with patch.dict(os.environ, {"MOSS_MIN_SCORE": "1.5"}, clear=True):
+            with self.assertRaisesRegex(RuntimeError, "between 0.0 and 1.0"):
+                self.ship._moss_min_score()
+
+    async def test_query_cli_passes_min_score_and_handles_no_results(self):
+        client = MagicMock()
+        client.__aenter__ = AsyncMock(return_value=client)
+        client.__aexit__ = AsyncMock(return_value=False)
+        client.load_index = AsyncMock()
+        client.query = AsyncMock(return_value=SimpleNamespace(docs=[]))
+        env = {
+            "MOSS_PROJECT_ID": "id",
+            "MOSS_PROJECT_KEY": "key",
+            "MOSS_INDEX_NAME": "firstbyte-test",
+        }
+        output = io.StringIO()
+        with patch.dict(os.environ, env, clear=True), \
+             patch.object(index_query, "MossClient", return_value=client), \
+             contextlib.redirect_stdout(output):
+            await index_query.main("question", 3, 0.8, 0.65)
+        options = client.query.await_args.args[2]
+        self.assertAlmostEqual(options.min_score, 0.65)
+        self.assertIn("(no results)", output.getvalue())
+
 
 class ObservabilityTests(unittest.IsolatedAsyncioTestCase):
     async def test_real_sdk_events_print_latency_and_final_usage_without_double_counting(self):
         from livekit.agents import ChatMessage, ConversationItemAddedEvent, SessionUsageUpdatedEvent
-        from livekit.agents.metrics import AgentSessionUsage, LLMModelUsage
+        from livekit.agents.metrics import (
+            AgentSessionUsage,
+            EOTModelUsage,
+            InterruptionModelUsage,
+            LLMModelUsage,
+        )
         ship = load_module("course_ship_metrics", "sections/04-ship-it/agent.py")
         callbacks = {}
         shutdown = []
         class Session:
-            usage = AgentSessionUsage(model_usage=[LLMModelUsage(
-                provider="test", model="test", input_tokens=100, output_tokens=20)])
+            usage = AgentSessionUsage(model_usage=[
+                LLMModelUsage(
+                    provider="test", model="test", input_tokens=100, output_tokens=20,
+                ),
+                EOTModelUsage(provider="livekit", model="v1-mini", total_requests=4),
+                InterruptionModelUsage(
+                    provider="livekit", model="adaptive", total_requests=3,
+                ),
+            ])
             def on(self, event):
                 def register(callback):
                     callbacks[event] = callback
@@ -258,22 +350,19 @@ class ObservabilityTests(unittest.IsolatedAsyncioTestCase):
         output = io.StringIO()
         with contextlib.redirect_stdout(output):
             callbacks["conversation_item_added"](ConversationItemAddedEvent(item=ChatMessage(
-                role="user", content=["Hello"], metrics={
-                    "end_of_turn_delay": .3, "transcription_delay": .1})))
-            for _ in range(3):
-                callbacks["session_usage_updated"](SessionUsageUpdatedEvent(usage=session.usage))
-            callbacks["conversation_item_added"](ConversationItemAddedEvent(item=ChatMessage(
                 role="assistant", content=["Hello"], metrics={"e2e_latency": .8,
                 "llm_node_ttft": .2, "tts_node_ttfb": .1})))
+            for _ in range(2):
+                callbacks["session_usage_updated"](SessionUsageUpdatedEvent(usage=session.usage))
             await shutdown[0]()
         text = output.getvalue()
-        self.assertIn("END OF TURN (+ transcript 100 ms)", text)
-        self.assertIn("800 ms", text)
-        self.assertIn("handoffs between clocks", text)
-        self.assertIn("running total:", text)
+        self.assertIn("server_e2e=800ms", text)
+        self.assertIn("response=COMPLETE", text)
         self.assertIn("session summary:", text)
-        self.assertEqual(text.count("llm_prompt=100"), 2)
+        self.assertEqual(text.count("llm_prompt=100"), 3)
         self.assertNotIn("llm_prompt=200", text)
+        self.assertEqual(text.count("eot_requests=4"), 3)
+        self.assertEqual(text.count("interruption_requests=3"), 3)
 
 
 class LockConsistencyTests(unittest.TestCase):
@@ -286,6 +375,51 @@ class LockConsistencyTests(unittest.TestCase):
         packages = [{p["name"]: p["version"] for p in lock["package"]} for lock in locks]
         for name in packages[0].keys() & packages[1].keys():
             self.assertEqual(packages[0][name], packages[1][name], name)
+        expected = {
+            "livekit-agents": "1.8.12",
+            "livekit-plugins-silero": "1.8.12",
+            "livekit-protocol": "1.1.32",
+            "moss": "1.24.0",
+        }
+        for package, version in expected.items():
+            self.assertEqual(packages[0][package], version)
+            self.assertEqual(packages[1][package], version)
+
+    def test_every_agent_uses_the_configurable_current_model(self):
+        for number, section in enumerate(sorted((ROOT / "sections").glob("*/agent.py")), 2):
+            with self.subTest(section=section.parent.name):
+                source = section.read_text()
+                self.assertIn("google/gemma-4-31b-it", source)
+                self.assertIn("LLM_MODEL", source)
+                self.assertNotIn("gpt-4o-mini", source)
+                self.assertIn(f"Course Section {number} / Directory 0{number - 1}", source)
+                self.assertIn("lk agent console", source)
+                self.assertNotIn("lk agent dev", source)
+
+    def test_turn_handling_invariants_match_the_course_progression(self):
+        sources = {
+            path.parent.name: path.read_text()
+            for path in sorted((ROOT / "sections").glob("*/agent.py"))
+        }
+        self.assertIn(
+            'preemptive_generation={"enabled": True}',
+            sources["02-production-ux"],
+        )
+        for directory in ("03-grounding-moss", "04-ship-it"):
+            with self.subTest(directory=directory, setting="preemptive"):
+                self.assertIn(
+                    'preemptive_generation={"enabled": False}',
+                    sources[directory],
+                )
+        for directory in ("02-production-ux", "03-grounding-moss", "04-ship-it"):
+            with self.subTest(directory=directory, setting="interruption"):
+                self.assertIn('"mode": "adaptive"', sources[directory])
+
+    def test_container_tooling_is_reproducible(self):
+        dockerfile = (ROOT / "sections/04-ship-it/Dockerfile").read_text()
+        self.assertIn("ghcr.io/astral-sh/uv:0.11.6", dockerfile)
+        self.assertIn("UV_COMPILE_BYTECODE=1", dockerfile)
+        self.assertNotIn("uv:latest", dockerfile)
 
 
 if __name__ == "__main__":
